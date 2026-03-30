@@ -66,20 +66,20 @@ export default function CalendarView() {
   const monthRevenue = monthOrders.filter(o => o.status === 'Завершен').reduce((s, o) => s + (o.amount || 0), 0);
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-5 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Календарь</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Календарь</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{monthOrders.length} заказов · {monthRevenue.toLocaleString('ru-RU')} ₽</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-card border border-border rounded-xl overflow-hidden">
-            <button onClick={prev} className="px-3 py-2 hover:bg-muted transition-colors"><ChevronLeft className="w-4 h-4" /></button>
-            <span className="px-4 py-2 text-sm font-semibold min-w-32 text-center">{MONTHS_RU[month]} {year}</span>
-            <button onClick={next} className="px-3 py-2 hover:bg-muted transition-colors"><ChevronRight className="w-4 h-4" /></button>
+            <button onClick={prev} className="px-2.5 py-2 hover:bg-muted transition-colors"><ChevronLeft className="w-4 h-4" /></button>
+            <span className="px-3 py-2 text-sm font-semibold min-w-28 text-center">{MONTHS_RU[month]} {year}</span>
+            <button onClick={next} className="px-2.5 py-2 hover:bg-muted transition-colors"><ChevronRight className="w-4 h-4" /></button>
           </div>
           <Button size="sm" onClick={() => setModal('new')}>
-            <Plus className="w-4 h-4 mr-1" /> Новый заказ
+            <Plus className="w-4 h-4 mr-1" /> Новый
           </Button>
         </div>
       </div>
@@ -100,14 +100,14 @@ export default function CalendarView() {
             return (
               <div
                 key={i}
-                className={`min-h-24 p-2 border-b border-r border-border last:border-r-0 ${!day ? 'bg-muted/20' : isWeekend ? 'bg-rose-50/30' : 'hover:bg-muted/10'} transition-colors`}
+                className={`min-h-14 sm:min-h-24 p-1 sm:p-2 border-b border-r border-border last:border-r-0 ${!day ? 'bg-muted/20' : isWeekend ? 'bg-rose-50/30' : 'hover:bg-muted/10'} transition-colors`}
               >
                 {day && (
                   <>
-                    <div className={`text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday(day) ? 'bg-primary text-white' : isWeekend ? 'text-rose-500' : 'text-foreground'}`}>
+                    <div className={`text-xs font-semibold mb-0.5 sm:mb-1 w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full ${isToday(day) ? 'bg-primary text-white' : isWeekend ? 'text-rose-500' : 'text-foreground'}`}>
                       {day}
                     </div>
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.5 hidden sm:block">
                       {dayOrders.slice(0, 3).map(o => (
                         <button
                           key={o.id}
@@ -122,15 +122,26 @@ export default function CalendarView() {
                         <div className="text-xs text-muted-foreground pl-1">+{dayOrders.length - 3} ещё</div>
                       )}
                     </div>
+                    {/* Mobile: dots */}
+                    <div className="flex flex-wrap gap-0.5 sm:hidden mt-0.5">
+                      {dayOrders.slice(0, 3).map(o => (
+                        <button
+                          key={o.id}
+                          onClick={() => setSelectedOrder(o)}
+                          className={`w-1.5 h-1.5 rounded-full ${statusColor[o.status] || 'bg-muted-foreground'}`}
+                          title={o.title}
+                        />
+                      ))}
+                    </div>
                   </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                  )}
+                  </div>
+                  );
+                  })}
+                  </div>
+                  </div>
 
-      {/* Selected order detail */}
+                  {/* Selected order detail */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setSelectedOrder(null)}>
           <div className="bg-card rounded-2xl border border-border p-6 max-w-sm w-full space-y-3 shadow-xl" onClick={e => e.stopPropagation()}>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import OrderComments from './OrderComments';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,6 +83,12 @@ export default function OrderModal({ open, onClose, order, onSaved }) {
             <Textarea className="mt-1" value={form.description} onChange={e => set('description', e.target.value)} placeholder="Детали заказа..." rows={3} />
           </div>
         </div>
+        {order?.id && (
+          <div className="border-t border-border pt-4">
+            <OrderComments orderId={order.id} />
+          </div>
+        )}
+
         <div className="flex gap-2 justify-end pt-2">
           <Button variant="outline" onClick={onClose}>Отмена</Button>
           <Button onClick={handleSave} disabled={saving || !form.title}>

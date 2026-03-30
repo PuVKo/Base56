@@ -1,0 +1,22 @@
+{
+  "name": "Comment",
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "string",
+      "title": "ID \u0437\u0430\u043a\u0430\u0437\u0430"
+    },
+    "text": {
+      "type": "string",
+      "title": "\u0422\u0435\u043a\u0441\u0442"
+    },
+    "author": {
+      "type": "string",
+      "title": "\u0410\u0432\u0442\u043e\u0440"
+    }
+  },
+  "required": [
+    "order_id",
+    "text"
+  ]
+}
