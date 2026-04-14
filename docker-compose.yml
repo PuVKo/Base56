@@ -1,0 +1,17 @@
+# Локальная БД для разработки (данные не совпадают с продом на Timeweb).
+# Запуск: npm run db:local:up (из корня репо)
+# Остановка: docker compose down
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: base56
+      POSTGRES_PASSWORD: base56
+      POSTGRES_DB: base56
+    ports:
+      - '5432:5432'
+    volumes:
+      - base56_pg_data:/var/lib/postgresql/data
+
+volumes:
+  base56_pg_data:

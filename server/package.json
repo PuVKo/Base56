@@ -1,0 +1,30 @@
+{
+  "name": "base56-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/prisma-with-schema.mjs generate && node --watch src/index.js",
+    "start": "node src/index.js",
+    "db:push": "node scripts/prisma-with-schema.mjs db push",
+    "db:migrate": "node scripts/prisma-with-schema.mjs migrate dev",
+    "db:migrate:deploy": "node scripts/prisma-with-schema.mjs migrate deploy",
+    "db:migrate:apply-pg": "node scripts/pg-migrate-apply.mjs",
+    "build:server": "sh scripts/build-server.sh",
+    "db:studio": "node scripts/prisma-with-schema.mjs studio",
+    "export:bookings": "node scripts/export-bookings.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "bcryptjs": "^3.0.3",
+    "connect-pg-simple": "^10.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.1",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.3.2",
+    "express-session": "^1.19.0",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.20.0",
+    "prisma": "^6.19.0",
+    "session-file-store": "^1.5.0"
+  }
+}

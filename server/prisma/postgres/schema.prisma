@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthTokenType {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  /// Логин для входа и отображения (уникальный, нижний регистр)
+  login            String?   @unique
+  passwordHash     String
+  emailVerifiedAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  /// Настройки UI (плитки, панель фильтров) — JSON
+  uiPrefs          Json?
+  bookings         Booking[]
+  fieldDefinitions FieldDefinition[]
+  authTokens       AuthToken[]
+}
+
+model AuthToken {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      AuthTokenType
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([userId, type])
+}
+
+model Booking {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model FieldDefinition {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  label     String
+  type      String
+  sortOrder Int      @default(0)
+  system    Boolean  @default(false)
+  visible   Boolean  @default(true)
+  iconKey   String?
+  options   Json?
+
+  @@unique([userId, key])
+  @@index([userId])
+}
