@@ -163,10 +163,14 @@ export function useBookingsAndFields() {
           method: 'PATCH',
           body: JSON.stringify(patch),
         });
-        fieldPatchByIdRef.current.delete(fid);
-        setFields((prev) =>
-          prev.map((f) => (f.id === fid ? row : f)).sort((a, b) => a.sortOrder - b.sortOrder),
-        );
+        const patchAfter = fieldPatchByIdRef.current.get(fid);
+        const superseded = patchAfter !== patch;
+        if (!superseded) fieldPatchByIdRef.current.delete(fid);
+        if (!superseded) {
+          setFields((prev) =>
+            prev.map((f) => (f.id === fid ? row : f)).sort((a, b) => a.sortOrder - b.sortOrder),
+          );
+        }
       }
 
       // deletes

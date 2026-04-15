@@ -58,6 +58,14 @@ export function createSessionMiddleware() {
     });
   }
 
+  // session-file-store делает atomic rename; на Windows с антивирусом/индексацией часто EPERM.
+  if (process.platform === 'win32' && !isProd) {
+    return session({
+      ...base,
+      store: new session.MemoryStore(),
+    });
+  }
+
   const sessionsDir = path.join(__dirname, '..', '.sessions');
   fs.mkdirSync(sessionsDir, { recursive: true });
   const FileStore = createFileStore(session);

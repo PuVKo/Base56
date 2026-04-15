@@ -64,7 +64,6 @@ export default function App({ currentUser = null }) {
     applyBookingLocal,
     flushNow,
     hasPendingWork,
-    syncStatus,
     syncError,
     clearSyncError,
     patchFieldLocal,
@@ -532,7 +531,6 @@ export default function App({ currentUser = null }) {
               deleteFieldLocal={deleteFieldLocal}
               reorderFieldsLocal={reorderFieldsLocal}
               flushNow={flushNow}
-              syncStatus={syncStatus}
               currentUser={currentUser}
               settingsTab={settingsTab}
               onSettingsTabChange={setSettingsTab}

@@ -137,7 +137,6 @@ function ProfileAccountPanel({ currentUser, flushNow }) {
  * @param {(id: string) => void} props.deleteFieldLocal
  * @param {(sorted: any[]) => void} props.reorderFieldsLocal
  * @param {() => Promise<void>} props.flushNow
- * @param {'synced' | 'pending' | 'syncing' | 'error'} [props.syncStatus]
  * @param {{ id: string, email: string, login?: string | null, emailVerified?: boolean } | null} [props.currentUser]
  * @param {'profile' | 'fields'} [props.settingsTab]
  * @param {(tab: 'profile' | 'fields') => void} [props.onSettingsTabChange]
@@ -153,14 +152,11 @@ export function SettingsView({
   deleteFieldLocal,
   reorderFieldsLocal,
   flushNow,
-  syncStatus = 'synced',
   currentUser = null,
   settingsTab = 'fields',
   onSettingsTabChange = () => {},
 }) {
   const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-  const syncing = syncStatus === 'syncing';
   const [msg, setMsg] = useState('');
   const [dumpYearKey, setDumpYearKey] = useState('');
   const [dumpBusy, setDumpBusy] = useState(false);
@@ -517,21 +513,19 @@ export function SettingsView({
               >
                 <button
                   type="button"
-                  draggable={!busy && !syncing}
+                  draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData('text/plain', f.id);
                     e.dataTransfer.effectAllowed = 'move';
                   }}
                   onDragEnd={() => {}}
-                  className="p-1.5 mt-0.5 rounded text-notion-muted hover:text-white hover:bg-notion-hover cursor-grab active:cursor-grabbing touch-manipulation shrink-0 disabled:opacity-30"
-                  disabled={busy || syncing}
+                  className="p-1.5 mt-0.5 rounded text-notion-muted hover:text-white hover:bg-notion-hover cursor-grab active:cursor-grabbing touch-manipulation shrink-0"
                   aria-label="Перетащить"
                 >
                   <GripVertical className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
-                  disabled={busy || syncing}
                   onClick={() => setIconPickerId((cur) => (cur === f.id ? null : f.id))}
                   className="p-1.5 mt-0.5 -ml-1 rounded-md text-notion-muted/70 hover:bg-notion-hover hover:text-white shrink-0"
                   title="Значок"
@@ -540,7 +534,7 @@ export function SettingsView({
                   <RowIcon className="w-4 h-4" aria-hidden />
                 </button>
                 <div className="flex-1 min-w-0 pt-1">
-                  <EditableLabel initial={f.label} onCommit={(t) => updateLabel(f, t)} disabled={busy || syncing} />
+                  <EditableLabel initial={f.label} onCommit={(t) => updateLabel(f, t)} />
                   <div className="text-[11px] text-notion-muted/70 mt-0.5 truncate">
                     {typeLabel}
                     {f.system ? ' · системное' : ''}
@@ -550,7 +544,6 @@ export function SettingsView({
                   {hasOpts ? (
                     <button
                       type="button"
-                      disabled={busy || syncing}
                       onClick={() => setExpandedId(open ? null : f.id)}
                       className="p-2 rounded-md text-notion-muted hover:bg-notion-hover hover:text-white"
                       title="Варианты"
@@ -561,7 +554,6 @@ export function SettingsView({
                   ) : null}
                   <button
                     type="button"
-                    disabled={busy || syncing}
                     onClick={() => toggleVisible(f)}
                     className="p-2 rounded-md text-notion-muted hover:bg-notion-hover hover:text-white"
                     title={f.visible ? 'Скрыть в форме' : 'Показать'}
@@ -571,7 +563,6 @@ export function SettingsView({
                   {!f.system ? (
                     <button
                       type="button"
-                      disabled={busy || syncing}
                       onClick={() => removeField(f)}
                       className="p-2 rounded-md text-rose-300/80 hover:bg-rose-950/40"
                       title="Удалить"
@@ -587,7 +578,6 @@ export function SettingsView({
                     <p className="text-[11px] text-notion-muted/80">Значок</p>
                     <button
                       type="button"
-                      disabled={busy || syncing}
                       onClick={() => {
                         void updateIconKey(f, '');
                         setIconPickerId(null);
@@ -609,7 +599,6 @@ export function SettingsView({
                       onChange={(e) => setIconQuery(e.target.value)}
                       placeholder="Поиск значка…"
                       className="col-span-4 sm:col-span-6 w-full rounded-lg border border-notion-border/80 bg-notion-bg px-3 py-2 text-sm text-white placeholder:text-notion-muted/60 outline-none focus:ring-1 focus:ring-violet-500/50"
-                      disabled={busy || syncing}
                     />
                     {FIELD_ICON_CHOICES.filter((c) => {
                       const q = iconQuery.trim().toLowerCase();
@@ -621,7 +610,6 @@ export function SettingsView({
                         <button
                           key={c.key}
                           type="button"
-                          disabled={busy || syncing}
                           onClick={() => {
                             void updateIconKey(f, c.key);
                             setIconPickerId(null);
@@ -645,7 +633,6 @@ export function SettingsView({
               {open && hasOpts ? (
                 <FieldOptionsPanel
                   field={f}
-                  disabled={busy || syncing}
                   onOptionsCommit={(items) => patchFieldLocal(f.id, { options: { items } })}
                 />
               ) : null}
@@ -657,7 +644,6 @@ export function SettingsView({
       <div className="relative mt-1" ref={pickerRef}>
         <button
           type="button"
-          disabled={busy || syncing}
           onClick={() => {
             setPickerOpen((v) => !v);
             setTypeQuery('');
@@ -851,7 +837,6 @@ export function SettingsView({
                   onChange={(e) => setNewName(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-white"
                   placeholder="Например: Площадка"
-                  disabled={busy}
                 />
               </label>
               <div className="space-y-2">
@@ -859,7 +844,6 @@ export function SettingsView({
                   <span className="text-xs text-notion-muted uppercase tracking-wide">Значок</span>
                   <button
                     type="button"
-                    disabled={busy}
                     onClick={() => setNewIconKey('')}
                     className="text-xs text-notion-muted hover:text-white"
                     title="Сбросить (по типу)"
@@ -884,7 +868,6 @@ export function SettingsView({
                     onChange={(e) => setNewIconQuery(e.target.value)}
                     placeholder="Поиск значка…"
                     className="col-span-2 w-full rounded-lg border border-notion-border/80 bg-notion-bg px-3 py-2 text-sm text-white placeholder:text-notion-muted/60 outline-none focus:ring-1 focus:ring-violet-500/50"
-                    disabled={busy}
                   />
                   {FIELD_ICON_CHOICES.filter((c) => {
                     const q = newIconQuery.trim().toLowerCase();
@@ -894,7 +877,6 @@ export function SettingsView({
                     <button
                       key={c.key}
                       type="button"
-                      disabled={busy}
                       onClick={() => setNewIconKey(c.key)}
                       className={`flex items-center justify-center px-2 py-2 rounded-lg border transition-colors aspect-square ${
                         newIconKey === c.key
@@ -912,7 +894,6 @@ export function SettingsView({
               <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
                 <button
                   type="button"
-                  disabled={busy}
                   onClick={() => setNameModal(null)}
                   className="px-4 py-2 rounded-lg border border-notion-border text-sm text-notion-muted hover:bg-notion-hover hover:text-white"
                 >
@@ -920,7 +901,7 @@ export function SettingsView({
                 </button>
                 <button
                   type="submit"
-                  disabled={busy || !newName.trim()}
+                  disabled={!newName.trim()}
                   className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium disabled:opacity-40"
                 >
                   Создать
@@ -1046,14 +1027,17 @@ export function SettingsView({
   );
 }
 
+const FIELD_OPTIONS_SAVE_DEBOUNCE_MS = 450;
+
 /**
  * @param {object} p
  * @param {any} p.field
- * @param {boolean} p.disabled
  * @param {(items: any[]) => void} p.onOptionsCommit
  */
-function FieldOptionsPanel({ field, disabled, onOptionsCommit }) {
+function FieldOptionsPanel({ field, onOptionsCommit }) {
   const [items, setItems] = useState(() => getFieldOptionItems(field));
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const skipNextRef = useRef(true);
   const lastCommittedRef = useRef('');
   const onCommitRef = useRef(onOptionsCommit);
@@ -1085,9 +1069,26 @@ function FieldOptionsPanel({ field, disabled, onOptionsCommit }) {
     }
     const json = JSON.stringify({ items });
     if (json === lastCommittedRef.current) return;
-    lastCommittedRef.current = json;
-    onCommitRef.current(items);
+    const t = setTimeout(() => {
+      const latest = itemsRef.current;
+      const j = JSON.stringify({ items: latest });
+      if (j === lastCommittedRef.current) return;
+      lastCommittedRef.current = j;
+      onCommitRef.current(latest);
+    }, FIELD_OPTIONS_SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
   }, [items]);
+
+  useEffect(
+    () => () => {
+      const latest = itemsRef.current;
+      const j = JSON.stringify({ items: latest });
+      if (j === lastCommittedRef.current) return;
+      lastCommittedRef.current = j;
+      onCommitRef.current(latest);
+    },
+    [],
+  );
 
   return (
     <div className="px-3 pb-4 pl-11 sm:pl-12 bg-black/20 border-t border-notion-border/40">
@@ -1109,7 +1110,7 @@ function FieldOptionsPanel({ field, disabled, onOptionsCommit }) {
           >
             <button
               type="button"
-              draggable={!disabled}
+              draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData('text/plain', it.id);
               }}
@@ -1130,7 +1131,6 @@ function FieldOptionsPanel({ field, disabled, onOptionsCommit }) {
                 setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, label: e.target.value } : x)))
               }
               className="flex-1 min-w-0 rounded-md border border-notion-border/80 bg-notion-bg px-2 py-1 text-sm text-white"
-              disabled={disabled}
             />
             <select
               value={NOTION_COLOR_KEYS.includes(it.color) ? it.color : 'gray'}
@@ -1140,7 +1140,6 @@ function FieldOptionsPanel({ field, disabled, onOptionsCommit }) {
                 )
               }
               className="rounded-md border border-notion-border/80 bg-notion-bg px-1.5 py-1 text-xs text-white max-w-[6.5rem]"
-              disabled={disabled}
             >
               {NOTION_COLOR_KEYS.map((c) => (
                 <option key={c} value={c}>
@@ -1150,7 +1149,7 @@ function FieldOptionsPanel({ field, disabled, onOptionsCommit }) {
             </select>
             <button
               type="button"
-              disabled={disabled || items.length <= 1}
+              disabled={items.length <= 1}
               onClick={() => setItems((prev) => prev.filter((x) => x.id !== it.id))}
               className="p-1.5 rounded-md text-notion-muted hover:text-rose-300 hover:bg-rose-950/30 shrink-0 disabled:opacity-30"
               title="Удалить вариант"
@@ -1163,7 +1162,6 @@ function FieldOptionsPanel({ field, disabled, onOptionsCommit }) {
       <div className="flex flex-col sm:flex-row gap-2 mt-3">
         <button
           type="button"
-          disabled={disabled}
           onClick={() =>
             setItems((prev) => [...prev, { id: newId(), label: `Вариант ${prev.length + 1}`, color: 'gray' }])
           }
@@ -1176,7 +1174,7 @@ function FieldOptionsPanel({ field, disabled, onOptionsCommit }) {
   );
 }
 
-function EditableLabel({ initial, onCommit, disabled }) {
+function EditableLabel({ initial, onCommit }) {
   const [val, setVal] = useState(initial);
   const [editing, setEditing] = useState(false);
 
@@ -1200,13 +1198,11 @@ function EditableLabel({ initial, onCommit, disabled }) {
           setEditing(false);
         }
       }}
-      disabled={disabled}
       className="w-full rounded-md border border-violet-500/40 bg-notion-bg px-2 py-1 text-sm text-white font-medium"
     />
   ) : (
     <button
       type="button"
-      disabled={disabled}
       onClick={() => setEditing(true)}
       className="text-left text-sm font-medium text-white hover:text-violet-200 w-full truncate"
     >
