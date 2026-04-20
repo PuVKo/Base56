@@ -795,6 +795,32 @@ async function main() {
     });
   }
 
+  const serverIndexShim = path.join(serverSrcDir, '..', 'index.js');
+  // #region agent log
+  fetch('http://127.0.0.1:7387/ingest/791f3908-02e5-49cf-82aa-0b390ff7207b', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'b98ec6' },
+    body: JSON.stringify({
+      sessionId: 'b98ec6',
+      runId: process.env.DEBUG_RUN_ID ?? 'pre-listen',
+      hypothesisId: 'H1',
+      location: 'server/src/index.js:before-listen',
+      message: 'startup context (deploy path / PM2 cwd)',
+      data: {
+        port: PORT,
+        cwd: process.cwd(),
+        argv0: process.argv[0],
+        argv1: process.argv[1],
+        webDistExists: fs.existsSync(webDistPath),
+        serverIndexShimExists: fs.existsSync(serverIndexShim),
+        pmId: process.env.pm_id ?? null,
+        nodeAppInstance: process.env.NODE_APP_INSTANCE ?? null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+
   app.listen(PORT, () => {
     console.log(
       `Base56 listen PORT=${PORT} (env PORT=${process.env.PORT ?? ''}, NODE_ENV=${process.env.NODE_ENV ?? ''})`,
