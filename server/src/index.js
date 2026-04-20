@@ -14,7 +14,9 @@ const __filename = fileURLToPath(import.meta.url);
 const serverSrcDir = path.dirname(__filename);
 /** Сборка Vite из корня репозитория: ../dist относительно server/ */
 const webDistPath = path.join(serverSrcDir, '..', '..', 'dist');
-const PORT = Number(process.env.PORT) || 3001;
+const PORT =
+  Number(process.env.PORT) ||
+  (process.env.NODE_ENV === 'production' ? 8080 : 3001);
 const ADMIN_RESET_SECRET = process.env.ADMIN_RESET_SECRET?.trim();
 
 const OPTION_COLORS = new Set(['gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red']);
