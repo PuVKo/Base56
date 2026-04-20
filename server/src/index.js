@@ -14,9 +14,12 @@ const __filename = fileURLToPath(import.meta.url);
 const serverSrcDir = path.dirname(__filename);
 /** Сборка Vite из корня репозитория: ../dist относительно server/ */
 const webDistPath = path.join(serverSrcDir, '..', '..', 'dist');
-const PORT =
-  Number(process.env.PORT) ||
-  (process.env.NODE_ENV === 'production' ? 8080 : 3001);
+/**
+ * В Timeweb Apps порт обычно передаётся через env PORT (часто 8080).
+ * Если PORT не задан, по умолчанию слушаем 8080, чтобы healthcheck не висел.
+ * Для локалки порт задаётся в server/.env (обычно 3001).
+ */
+const PORT = Number(process.env.PORT) || 8080;
 const ADMIN_RESET_SECRET = process.env.ADMIN_RESET_SECRET?.trim();
 
 const OPTION_COLORS = new Set(['gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red']);
@@ -793,7 +796,12 @@ async function main() {
   }
 
   app.listen(PORT, () => {
-    console.log(`Base56 http://localhost:${PORT}${fs.existsSync(webDistPath) ? ' (API + статика)' : ' (только API)'}`);
+    console.log(
+      `Base56 listen PORT=${PORT} (env PORT=${process.env.PORT ?? ''}, NODE_ENV=${process.env.NODE_ENV ?? ''})`,
+    );
+    console.log(
+      `Base56 http://localhost:${PORT}${fs.existsSync(webDistPath) ? ' (API + статика)' : ' (только API)'}`,
+    );
   });
 }
 
