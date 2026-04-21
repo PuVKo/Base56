@@ -1,3 +1,4 @@
+import './earlyBoot.js';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -9,6 +10,8 @@ import { mountAuthRoutes } from './authRoutes.js';
 import { isRusenderConfigured, isSmtpConfigured } from './mail.js';
 import { createSessionMiddleware, requireAuth } from './session.js';
 import { normalizeClientUi } from './userClientUi.js';
+
+console.error('[Base56:imports] index module body after static imports');
 
 const __filename = fileURLToPath(import.meta.url);
 const serverSrcDir = path.dirname(__filename);
@@ -836,7 +839,7 @@ async function main() {
   }).catch(() => {});
   // #endregion
 
-  app.listen(PORT, LISTEN_HOST, () => {
+  const server = app.listen(PORT, LISTEN_HOST, () => {
     console.log(
       `Base56 listen PORT=${PORT} host=${LISTEN_HOST} (env PORT=${process.env.PORT ?? ''}, NODE_ENV=${process.env.NODE_ENV ?? ''})`,
     );
@@ -844,6 +847,10 @@ async function main() {
       `Base56 http://localhost:${PORT}${fs.existsSync(webDistPath) ? ' (API + статика)' : ' (только API)'}`,
     );
     void runStartupBackfills();
+  });
+  server.on('error', (err) => {
+    console.error('[Base56] listen error', err);
+    process.exit(1);
   });
 }
 
