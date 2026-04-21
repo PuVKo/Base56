@@ -227,16 +227,18 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(cors({ origin: ['http://localhost:5174', 'http://127.0.0.1:5174'], credentials: true }));
 app.use(express.json({ limit: '20mb' }));
+
+/** До session: иначе health проходит через connect-pg-simple и может зависнуть на БД → деплой без конца. */
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 // До createSessionMiddleware: в production без SESSION_SECRET ≥16 символов будет throw — в логах не будет «Base56 listen».
 console.log(
   `[Base56] boot cwd=${process.cwd()} NODE_ENV=${process.env.NODE_ENV ?? ''} sessionSecretOk=${(process.env.SESSION_SECRET?.trim()?.length ?? 0) >= 16}`,
 );
 app.use(createSessionMiddleware());
 mountAuthRoutes(app, prisma, { ensureDefaultFieldsForUser: ensureDefaultFields });
-
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true });
-});
 
 app.get('/api/fields', requireAuth, async (req, res) => {
   try {

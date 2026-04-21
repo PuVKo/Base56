@@ -14,6 +14,9 @@ function sessionSecret() {
   const fromEnv = process.env.SESSION_SECRET?.trim();
   if (fromEnv && fromEnv.length >= 16) return fromEnv;
   if (process.env.NODE_ENV === 'production') {
+    console.error(
+      '[Base56] FATAL: задайте SESSION_SECRET (≥16 символов) в переменных приложения — иначе процесс не стартует.',
+    );
     throw new Error('Задайте SESSION_SECRET (не короче 16 символов) для production');
   }
   return 'dev-base56-session-secret-not-for-production';
