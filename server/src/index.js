@@ -11,8 +11,6 @@ import { isRusenderConfigured, isSmtpConfigured } from './mail.js';
 import { createSessionMiddleware, requireAuth } from './session.js';
 import { normalizeClientUi } from './userClientUi.js';
 
-console.error('[Base56:imports] index module body after static imports');
-
 const __filename = fileURLToPath(import.meta.url);
 const serverSrcDir = path.dirname(__filename);
 /** Сборка Vite из корня репозитория: ../dist относительно server/ */
@@ -236,10 +234,6 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-// До createSessionMiddleware: в production без SESSION_SECRET ≥16 символов будет throw — в логах не будет «Base56 listen».
-console.log(
-  `[Base56] boot cwd=${process.cwd()} NODE_ENV=${process.env.NODE_ENV ?? ''} sessionSecretOk=${(process.env.SESSION_SECRET?.trim()?.length ?? 0) >= 16}`,
-);
 app.use(createSessionMiddleware());
 mountAuthRoutes(app, prisma, { ensureDefaultFieldsForUser: ensureDefaultFields });
 
@@ -814,37 +808,6 @@ async function main() {
   }
 
   const server = app.listen(PORT, LISTEN_HOST, () => {
-    // #region agent log
-    (() => {
-      const agentLogPath = path.join(serverSrcDir, '..', '..', 'debug-b98ec6.log');
-      const payload = {
-        sessionId: 'b98ec6',
-        hypothesisId: 'H2',
-        location: 'index.js:listen-callback',
-        message: 'listen ok',
-        data: {
-          PORT,
-          LISTEN_HOST,
-          cwd: process.cwd(),
-          hasWebDist: fs.existsSync(webDistPath),
-          hasDatabaseUrl: Boolean((process.env.DATABASE_URL ?? '').trim()),
-          envPort: process.env.PORT ?? '',
-        },
-        timestamp: Date.now(),
-      };
-      try {
-        fs.appendFileSync(agentLogPath, `${JSON.stringify(payload)}\n`);
-      } catch {
-        /* ignore */
-      }
-      console.error('[agent:b98ec6]', JSON.stringify(payload));
-      fetch('http://127.0.0.1:7387/ingest/791f3908-02e5-49cf-82aa-0b390ff7207b', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'b98ec6' },
-        body: JSON.stringify(payload),
-      }).catch(() => {});
-    })();
-    // #endregion
     console.log(
       `Base56 listen PORT=${PORT} host=${LISTEN_HOST} (env PORT=${process.env.PORT ?? ''}, NODE_ENV=${process.env.NODE_ENV ?? ''})`,
     );
