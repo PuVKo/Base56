@@ -25,6 +25,18 @@ const PORT = Number(process.env.PORT) || 8080;
 const LISTEN_HOST = (process.env.LISTEN_HOST ?? '').trim() || '0.0.0.0';
 const ADMIN_RESET_SECRET = process.env.ADMIN_RESET_SECRET?.trim();
 
+/** Локальная разработка + CORS_ORIGINS (через запятую) + APP_PUBLIC_URL (один origin). */
+function resolveCorsOrigins() {
+  const defaults = ['http://localhost:5174', 'http://127.0.0.1:5174'];
+  const extraList = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const single = (process.env.APP_PUBLIC_URL ?? '').trim().replace(/\/$/, '');
+  const fromPublic = single ? [single] : [];
+  return [...new Set([...defaults, ...extraList, ...fromPublic])];
+}
+
 const OPTION_COLORS = new Set(['gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red']);
 
 const DEFAULT_OPTION_SETS = {
@@ -226,7 +238,7 @@ async function backfillLegacyFieldOptions(userId) {
 
 const app = express();
 app.set('trust proxy', 1);
-app.use(cors({ origin: ['http://localhost:5174', 'http://127.0.0.1:5174'], credentials: true }));
+app.use(cors({ origin: resolveCorsOrigins(), credentials: true }));
 app.use(express.json({ limit: '20mb' }));
 
 /** До session: иначе health проходит через connect-pg-simple и может зависнуть на БД → деплой без конца. */
@@ -518,7 +530,12 @@ app.delete('/api/bookings/:id', requireAuth, async (req, res) => {
     await prisma.booking.delete({ where: { id: req.params.id } });
     res.json({ ok: true });
   } catch (e) {
-    res.status(404).json({ error: 'not found' });
+    if (e && typeof e === 'object' && e.code === 'P2025') {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    console.error(e);
+    res.status(500).json({ error: String(e?.message || e) });
   }
 });
 
