@@ -20,6 +20,8 @@ const webDistPath = path.join(serverSrcDir, '..', '..', 'dist');
  * Для локалки порт задаётся в server/.env (обычно 3001).
  */
 const PORT = Number(process.env.PORT) || 8080;
+/** В контейнере healthcheck идёт не на 127.0.0.1 — по умолчанию слушаем все интерфейсы. Локально: LISTEN_HOST=127.0.0.1 */
+const LISTEN_HOST = (process.env.LISTEN_HOST ?? '').trim() || '0.0.0.0';
 const ADMIN_RESET_SECRET = process.env.ADMIN_RESET_SECRET?.trim();
 
 const OPTION_COLORS = new Set(['gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red']);
@@ -756,6 +758,20 @@ app.post('/api/bookings/migrate', requireAuth, async (req, res) => {
   }
 });
 
+/** Раньше выполнялось до listen — при недоступной БД первый запрос к Postgres зависал и порт не открывался (деплой без /api/health). */
+async function runStartupBackfills() {
+  try {
+    const users = await prisma.user.findMany({ select: { id: true } });
+    for (const u of users) {
+      await ensureDefaultFields(u.id);
+      await backfillClientNameFieldType(u.id);
+      await backfillLegacyFieldOptions(u.id);
+    }
+  } catch (e) {
+    console.error('Base56: startup backfill failed', e);
+  }
+}
+
 async function main() {
   const mailMode = (process.env.MAIL_MODE ?? '').trim().toLowerCase();
   if (mailMode === 'console' || mailMode === 'log') {
@@ -769,13 +785,6 @@ async function main() {
     console.log(
       'Почта: не настроена — задайте RUSENDER_API_KEY + MAIL_FROM или SMTP в server/.env (см. .env.example)',
     );
-  }
-
-  const users = await prisma.user.findMany({ select: { id: true } });
-  for (const u of users) {
-    await ensureDefaultFields(u.id);
-    await backfillClientNameFieldType(u.id);
-    await backfillLegacyFieldOptions(u.id);
   }
 
   if (fs.existsSync(webDistPath)) {
@@ -821,13 +830,14 @@ async function main() {
   }).catch(() => {});
   // #endregion
 
-  app.listen(PORT, () => {
+  app.listen(PORT, LISTEN_HOST, () => {
     console.log(
-      `Base56 listen PORT=${PORT} (env PORT=${process.env.PORT ?? ''}, NODE_ENV=${process.env.NODE_ENV ?? ''})`,
+      `Base56 listen PORT=${PORT} host=${LISTEN_HOST} (env PORT=${process.env.PORT ?? ''}, NODE_ENV=${process.env.NODE_ENV ?? ''})`,
     );
     console.log(
       `Base56 http://localhost:${PORT}${fs.existsSync(webDistPath) ? ' (API + статика)' : ' (только API)'}`,
     );
+    void runStartupBackfills();
   });
 }
 
