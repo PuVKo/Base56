@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+.git
+dist
+.env
+.env.*
+!.env.example
+**/.sessions
+.notion-import-tmp
+*.md
+.cursor
+**/*.log
