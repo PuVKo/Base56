@@ -50,7 +50,6 @@ const OPENAI_STYLE_TOOLS = [
           fields: {
             type: 'object',
             description: 'Пары ключ-значение полей записи (без id)',
-            additionalProperties: true,
           },
         },
         required: ['fields'],
@@ -66,7 +65,7 @@ const OPENAI_STYLE_TOOLS = [
         type: 'object',
         properties: {
           id: { type: 'string' },
-          fields: { type: 'object', additionalProperties: true, description: 'Только изменяемые поля' },
+          fields: { type: 'object', description: 'Только изменяемые поля' },
         },
         required: ['id', 'fields'],
       },
