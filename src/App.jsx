@@ -11,6 +11,7 @@ import {
   Plus,
   RefreshCw,
 } from 'lucide-react';
+import { AssistantView } from '@/components/AssistantView';
 import { BookingModal } from '@/components/BookingModal';
 import { CalendarView } from '@/components/CalendarView';
 import { DashboardPeriodPanelContent } from '@/components/DashboardPeriodPanel';
@@ -270,7 +271,7 @@ export default function App({ currentUser = null }) {
     );
   }
 
-  const showMonthChrome = activeView !== 'settings';
+  const showMonthChrome = activeView !== 'settings' && activeView !== 'assistant';
 
   return (
     <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-notion-bg">
@@ -302,6 +303,8 @@ export default function App({ currentUser = null }) {
                 <h1 className="text-lg font-semibold text-white">
                   {settingsTab === 'profile' ? 'Профиль' : 'Настройки'}
                 </h1>
+              ) : activeView === 'assistant' ? (
+                <h1 className="text-lg font-semibold text-white">Ассистент</h1>
               ) : activeView === 'dashboard' ? (
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="text-xs text-notion-muted uppercase tracking-wide">Дашборд</span>
@@ -668,6 +671,7 @@ export default function App({ currentUser = null }) {
               updateClientUi={updateClientUi}
             />
           ) : null}
+          {activeView === 'assistant' ? <AssistantView /> : null}
           {activeView === 'settings' ? (
             <SettingsView
               fields={fields}

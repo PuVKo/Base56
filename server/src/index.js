@@ -5,7 +5,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma } from './db.js';
+import { handleAssistantChat } from './assistantGemini.js';
 import { mountAuthRoutes } from './authRoutes.js';
 import { isRusenderConfigured, isSmtpConfigured } from './mail.js';
 import { createSessionMiddleware, requireAuth } from './session.js';
@@ -248,6 +250,24 @@ app.get('/api/health', (_req, res) => {
 
 app.use(createSessionMiddleware());
 mountAuthRoutes(app, prisma, { ensureDefaultFieldsForUser: ensureDefaultFields });
+
+const assistantLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.post('/api/assistant/chat', assistantLimiter, requireAuth, async (req, res) => {
+  try {
+    await handleAssistantChat(prisma, req, res);
+  } catch (e) {
+    console.error(e);
+    if (!res.headersSent) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  }
+});
 
 app.get('/api/fields', requireAuth, async (req, res) => {
   try {
