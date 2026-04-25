@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+/** Дешёвая модель на OpenRouter; переопределение: ASSISTANT_MODEL в server/.env */
+const DEFAULT_MODEL = 'meta-llama/llama-3.2-3b-instruct';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MAX_TOOL_ROUNDS = 5;
 const MAX_CLIENT_MESSAGES = 40;
 const LIST_FETCH_CAP = 200;
 
-/** Схемы инструментов (OpenAI-style); ниже конвертируются в Gemini functionDeclarations. */
-const OPENAI_STYLE_TOOLS = [
+const TOOLS = [
   {
     type: 'function',
     function: {
@@ -86,19 +87,6 @@ const OPENAI_STYLE_TOOLS = [
     },
   },
 ];
-
-const GEMINI_FUNCTION_DECLARATIONS = OPENAI_STYLE_TOOLS.map((t) => {
-  const fn = /** @type {{ name: string; description?: string; parameters?: unknown }} */ (t.function);
-  return {
-    name: fn.name,
-    description: fn.description ?? '',
-    parameters: fn.parameters ?? { type: 'object', properties: {} },
-  };
-});
-
-function geminiGenerateUrl(modelId) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`;
-}
 
 /**
  * @param {import('@prisma/client').PrismaClient} prisma
@@ -284,35 +272,20 @@ function normalizeClientMessage(msg) {
 }
 
 /**
- * @param {{ role: string; content: string }[]} trimmed
- * @returns {{ role: string; parts: { text: string }[] }[]}
+ * @param {unknown} tc
+ * @returns {{ id: string; name: string; arguments: string } | null}
  */
-function clientMessagesToGeminiContents(trimmed) {
-  const out = [];
-  for (const m of trimmed) {
-    const geminiRole = m.role === 'assistant' ? 'model' : 'user';
-    out.push({ role: geminiRole, parts: [{ text: m.content }] });
-  }
-  return out;
-}
-
-/**
- * @param {unknown} part
- * @returns {{ name: string; args: unknown; id?: string } | null}
- */
-function parseFunctionCallPart(part) {
-  if (!part || typeof part !== 'object') return null;
-  const fc = /** @type {{ functionCall?: unknown }} */ (part).functionCall;
-  if (!fc || typeof fc !== 'object') return null;
-  const name = /** @type {{ name?: unknown }} */ (fc).name;
-  const args = /** @type {{ args?: unknown }} */ (fc).args;
-  const id = /** @type {{ id?: unknown }} */ (fc).id;
+function parseToolCall(tc) {
+  if (!tc || typeof tc !== 'object') return null;
+  const id = /** @type {{ id?: unknown }} */ (tc).id;
+  const fn = /** @type {{ function?: unknown }} */ (tc).function;
+  if (typeof id !== 'string' || !id) return null;
+  if (!fn || typeof fn !== 'object') return null;
+  const name = /** @type {{ name?: unknown }} */ (fn).name;
+  const args = /** @type {{ arguments?: unknown }} */ (fn).arguments;
   if (typeof name !== 'string' || !name) return null;
-  return {
-    name,
-    args: args !== undefined ? args : {},
-    id: typeof id === 'string' && id ? id : undefined,
-  };
+  const argumentsStr = typeof args === 'string' ? args : JSON.stringify(args ?? {});
+  return { id, name, arguments: argumentsStr };
 }
 
 /**
@@ -325,10 +298,11 @@ export async function handleAssistantChat(prisma, req, res) {
     res.status(503).json({ error: 'Ассистент отключён (ASSISTANT_DISABLED=1).' });
     return;
   }
-  const apiKey = (process.env.GEMINI_API_KEY ?? '').trim();
+  const apiKey = (process.env.OPENROUTER_API_KEY ?? '').trim();
   if (!apiKey) {
     res.status(503).json({
-      error: 'Не задан GEMINI_API_KEY в server/.env (ключ: https://aistudio.google.com/apikey).',
+      error:
+        'Не задан OPENROUTER_API_KEY в server/.env (ключ: https://openrouter.ai/keys). Модель: ASSISTANT_MODEL.',
     });
     return;
   }
@@ -369,101 +343,116 @@ export async function handleAssistantChat(prisma, req, res) {
     'Отвечай по-русски, кратко, по существу.',
   ].join('\n');
 
-  /** @type {{ role: string; parts: unknown[] }[]} */
-  const contents = clientMessagesToGeminiContents(trimmed);
+  /** @type {Record<string, string>[]} */
+  const messages = [{ role: 'system', content: systemContent }];
+  for (const m of trimmed) {
+    messages.push({ role: m.role, content: m.content });
+  }
 
-  const url = geminiGenerateUrl(modelId);
-  const toolsPayload = [{ functionDeclarations: GEMINI_FUNCTION_DECLARATIONS }];
+  const referer = (process.env.OPENROUTER_HTTP_REFERER ?? process.env.APP_PUBLIC_URL ?? '').trim() || 'http://localhost';
+  const title = (process.env.OPENROUTER_APP_TITLE ?? 'Base56').trim() || 'Base56';
 
+  let lastModel = modelId;
   let rounds = 0;
   while (rounds < MAX_TOOL_ROUNDS) {
     rounds += 1;
-    let geminiRes;
+    let orRes;
     try {
-      geminiRes = await fetch(url, {
+      orRes = await fetch(OPENROUTER_URL, {
         method: 'POST',
         headers: {
-          'x-goog-api-key': apiKey,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
+          'HTTP-Referer': referer,
+          'X-Title': title,
         },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemContent }] },
-          contents,
-          tools: toolsPayload,
-          toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
-          generationConfig: { temperature: 0.3 },
+          model: modelId,
+          messages,
+          tools: TOOLS,
+          tool_choice: 'auto',
+          temperature: 0.3,
         }),
       });
     } catch (err) {
-      console.error('[assistant] fetch gemini', err);
-      res.status(502).json({ error: `Сеть: не удалось связаться с Gemini (${String(err?.message || err)})` });
+      console.error('[assistant] fetch openrouter', err);
+      res.status(502).json({ error: `Сеть: не удалось связаться с OpenRouter (${String(err?.message || err)})` });
       return;
     }
 
-    const rawText = await geminiRes.text();
+    const rawText = await orRes.text();
     let data;
     try {
       data = rawText ? JSON.parse(rawText) : {};
     } catch {
-      res.status(502).json({ error: 'Gemini вернул не-JSON.' });
+      res.status(502).json({ error: 'OpenRouter вернул не-JSON.' });
       return;
     }
 
-    if (!geminiRes.ok) {
-      const errObj = data && data.error;
-      const msg =
-        (errObj && (errObj.message || errObj.status)) || rawText.slice(0, 500) || geminiRes.statusText;
-      const status = geminiRes.status === 429 ? 429 : 502;
-      res.status(status).json({ error: String(msg) });
+    if (!orRes.ok) {
+      const errMsg =
+        data?.error?.message ||
+        data?.error ||
+        rawText.slice(0, 500) ||
+        orRes.statusText;
+      const status = orRes.status === 429 ? 429 : 502;
+      res.status(status).json({ error: String(errMsg) });
       return;
     }
 
-    if (data.promptFeedback?.blockReason) {
-      res.status(502).json({ error: `Запрос отклонён моделью: ${String(data.promptFeedback.blockReason)}` });
+    const choice = data.choices && data.choices[0];
+    const msg = choice?.message;
+    if (!msg || typeof msg !== 'object') {
+      res.status(502).json({ error: 'Пустой ответ модели (нет choices[0].message).' });
       return;
     }
 
-    const candidate = data.candidates && data.candidates[0];
-    if (!candidate || !candidate.content || !Array.isArray(candidate.content.parts)) {
-      res.status(502).json({ error: 'Пустой ответ модели (нет candidates).' });
-      return;
-    }
+    if (typeof data.model === 'string' && data.model) lastModel = data.model;
 
-    const finish = candidate.finishReason ? String(candidate.finishReason) : '';
-    if (finish === 'SAFETY' || finish === 'BLOCKLIST' || finish === 'PROHIBITED_CONTENT') {
-      res.status(502).json({ error: `Ответ остановлен: ${finish}` });
-      return;
-    }
+    const toolCalls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
 
-    const parts = candidate.content.parts;
-    const textPieces = [];
-    const functionCalls = [];
-    for (const part of parts) {
-      if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
-        textPieces.push(part.text);
-      }
-      const fc = parseFunctionCallPart(part);
-      if (fc) functionCalls.push(fc);
-    }
-
-    if (functionCalls.length === 0) {
+    if (toolCalls.length === 0) {
+      const text =
+        typeof msg.content === 'string'
+          ? msg.content
+          : msg.content != null
+            ? JSON.stringify(msg.content)
+            : '';
       res.json({
-        message: { role: 'assistant', content: textPieces.join('\n').trim() },
-        model: modelId,
+        message: { role: 'assistant', content: text.trim() },
+        model: lastModel,
       });
       return;
     }
 
-    contents.push({ role: 'model', parts: JSON.parse(JSON.stringify(parts)) });
+    messages.push({ ...msg, role: 'assistant' });
 
-    const userFrParts = [];
-    for (const fc of functionCalls) {
-      const result = await executeTool(prisma, userId, allowedKeys, fc.name, fc.args);
-      const fr = { name: fc.name, response: result };
-      if (fc.id) /** @type {{ id?: string }} */ (fr).id = fc.id;
-      userFrParts.push({ functionResponse: fr });
+    for (const tc of toolCalls) {
+      const p = parseToolCall(tc);
+      const rawId = typeof tc === 'object' && tc !== null && typeof tc.id === 'string' ? tc.id : '';
+      if (!p) {
+        if (rawId) {
+          messages.push({
+            role: 'tool',
+            tool_call_id: rawId,
+            content: JSON.stringify({ ok: false, error: 'invalid_tool_call' }),
+          });
+        }
+        continue;
+      }
+      let argsObj = {};
+      try {
+        argsObj = JSON.parse(p.arguments || '{}');
+      } catch {
+        argsObj = {};
+      }
+      const result = await executeTool(prisma, userId, allowedKeys, p.name, argsObj);
+      messages.push({
+        role: 'tool',
+        tool_call_id: p.id,
+        content: JSON.stringify(result),
+      });
     }
-    contents.push({ role: 'user', parts: userFrParts });
   }
 
   res.status(502).json({ error: 'Слишком много шагов с инструментами (лимит ассистента).' });

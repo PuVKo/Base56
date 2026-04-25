@@ -7,7 +7,7 @@ import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { prisma } from './db.js';
-import { handleAssistantChat } from './assistantGemini.js';
+import { handleAssistantChat } from './assistantOpenRouter.js';
 import { mountAuthRoutes } from './authRoutes.js';
 import { isRusenderConfigured, isSmtpConfigured } from './mail.js';
 import { createSessionMiddleware, requireAuth } from './session.js';

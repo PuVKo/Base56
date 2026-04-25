@@ -3,7 +3,7 @@ import { Send } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 /**
- * Чат с LLM (Google Gemini на сервере). История — только user/assistant для API.
+ * Чат с LLM (OpenRouter на сервере). История — только user/assistant для API.
  */
 export function AssistantView() {
   const [messages, setMessages] = useState(
@@ -54,7 +54,7 @@ export function AssistantView() {
     <div className="max-w-3xl mx-auto flex flex-col h-full min-h-[320px] gap-4">
       <p className="text-sm text-notion-muted">
         Запросы идут на сервер с вашей сессией: модель может читать и менять записи через инструменты. Нужен{' '}
-        <span className="text-notion-muted/90 font-medium">GEMINI_API_KEY</span> в{' '}
+        <span className="text-notion-muted/90 font-medium">OPENROUTER_API_KEY</span> в{' '}
         <code className="text-xs bg-notion-surface px-1 rounded">server/.env</code>.
       </p>
       <div className="flex-1 min-h-0 rounded-xl border border-notion-border bg-notion-surface/40 overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-3">
