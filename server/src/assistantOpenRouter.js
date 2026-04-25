@@ -7,6 +7,8 @@ import { randomUUID } from 'node:crypto';
  */
 const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_CREDITS_URL = 'https://openrouter.ai/settings/credits';
+
 const MAX_TOOL_ROUNDS = 5;
 const MAX_CLIENT_MESSAGES = 40;
 const LIST_FETCH_CAP = 200;
@@ -276,6 +278,22 @@ function normalizeClientMessage(msg) {
 }
 
 /**
+ * @param {string} raw
+ * @param {number} httpStatus
+ */
+function formatOpenRouterClientError(raw, httpStatus) {
+  const s = String(raw ?? '');
+  if (/insufficient credits|never purchased credits/i.test(s)) {
+    return {
+      status: 402,
+      message: `На аккаунте OpenRouter нет кредитов (или ключ привязан к другому аккаунту). Пополните баланс: ${OPENROUTER_CREDITS_URL}`,
+    };
+  }
+  if (httpStatus === 429) return { status: 429, message: s };
+  return { status: 502, message: s };
+}
+
+/**
  * @param {unknown} tc
  * @returns {{ id: string; name: string; arguments: string } | null}
  */
@@ -399,8 +417,8 @@ export async function handleAssistantChat(prisma, req, res) {
         data?.error ||
         rawText.slice(0, 500) ||
         orRes.statusText;
-      const status = orRes.status === 429 ? 429 : 502;
-      res.status(status).json({ error: String(errMsg) });
+      const { status, message } = formatOpenRouterClientError(String(errMsg), orRes.status);
+      res.status(status).json({ error: message });
       return;
     }
 
