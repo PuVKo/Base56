@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
+import { AssistantMarkdown } from '@/components/AssistantMarkdown';
 import { apiFetch } from '@/lib/api';
 
 /**
@@ -74,13 +75,13 @@ export function AssistantView() {
             className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[90%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${
+              className={`max-w-[90%] rounded-lg px-3 py-2 break-words ${
                 m.role === 'user'
-                  ? 'bg-violet-600/90 text-white'
-                  : 'bg-notion-hover/80 text-white/95 border border-notion-border/60'
+                  ? 'bg-violet-600/90 text-white text-sm whitespace-pre-wrap'
+                  : 'bg-notion-hover/80 border border-notion-border/60'
               }`}
             >
-              {m.content}
+              {m.role === 'user' ? m.content : <AssistantMarkdown text={m.content} />}
             </div>
           </div>
         ))}
