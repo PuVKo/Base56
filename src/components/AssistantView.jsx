@@ -61,6 +61,9 @@ export function AssistantView() {
         <span className="text-notion-muted/90 font-medium">OPENROUTER_API_KEY</span> в{' '}
         <code className="text-xs bg-notion-surface px-1 rounded">server/.env</code>.
       </p>
+      <p className="text-xs text-notion-muted/85">
+        Поле «Клиент» из записей в модель не передаётся. Текст сообщений в чате не фильтруется — не дублируйте там персональные данные без нужды.
+      </p>
       <div className="flex-1 min-h-0 rounded-xl border border-notion-border bg-notion-surface/40 overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-3">
         {messages.length === 0 ? (
           <p className="text-sm text-notion-muted">Например: «Покажи записи на завтра» или «Создай запись на 2026-04-25, название Консультация».</p>

@@ -107,13 +107,13 @@ const TOOLS = [
     function: {
       name: 'create_booking',
       description:
-        'Создать запись. id генерируется автоматически. Передай поля согласно схеме (date YYYY-MM-DD и т.д.).',
+        'Создать запись. id генерируется автоматически. Передай поля согласно схеме (date YYYY-MM-DD и т.д.). Поля типа «Клиент» (персональные данные) через ассистента недоступны.',
       parameters: {
         type: 'object',
         properties: {
           fields: {
             type: 'object',
-            description: 'Пары ключ-значение полей записи (без id)',
+            description: 'Пары ключ-значение полей записи (без id). Без полей типа «Клиент».',
           },
         },
         required: ['fields'],
@@ -124,12 +124,13 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'update_booking',
-      description: 'Обновить поля записи по id (частичное слияние с существующими данными).',
+      description:
+        'Обновить поля записи по id (частичное слияние с существующими данными). Поля типа «Клиент» через ассистента недоступны.',
       parameters: {
         type: 'object',
         properties: {
           id: { type: 'string' },
-          fields: { type: 'object', description: 'Только изменяемые поля' },
+          fields: { type: 'object', description: 'Только изменяемые поля (без полей типа «Клиент»).' },
         },
         required: ['id', 'fields'],
       },
@@ -152,15 +153,21 @@ const TOOLS = [
 ];
 
 /**
- * @param {import('@prisma/client').PrismaClient} prisma
- * @param {string} userId
+ * Ключи полей для ассистента: без типа `client` (персональные данные в модель не отправляются).
+ * @returns {{ writableKeys: Set<string>, redactedKeys: Set<string> }}
  */
-async function loadAllowedFieldKeys(prisma, userId) {
+async function loadAssistantFieldKeySets(prisma, userId) {
   const rows = await prisma.fieldDefinition.findMany({
     where: { userId },
-    select: { key: true },
+    select: { key: true, type: true },
   });
-  return new Set(rows.map((r) => r.key));
+  const writableKeys = new Set();
+  const redactedKeys = new Set();
+  for (const r of rows) {
+    if (r.type === 'client') redactedKeys.add(r.key);
+    else writableKeys.add(r.key);
+  }
+  return { writableKeys, redactedKeys };
 }
 
 /**
@@ -169,12 +176,29 @@ async function loadAllowedFieldKeys(prisma, userId) {
  */
 async function buildFieldsSummary(prisma, userId) {
   const rows = await prisma.fieldDefinition.findMany({
-    where: { userId },
+    where: { userId, type: { not: 'client' } },
     orderBy: { sortOrder: 'asc' },
     select: { key: true, label: true, type: true },
   });
-  if (rows.length === 0) return '(поля не настроены)';
+  if (rows.length === 0) {
+    const clientFields = await prisma.fieldDefinition.count({ where: { userId, type: 'client' } });
+    if (clientFields > 0) {
+      return '(только поле «Клиент» — в модель не входит; добавьте другие поля в настройках)';
+    }
+    return '(поля не настроены)';
+  }
   return rows.map((r) => `${r.key} (${r.label}, тип ${r.type})`).join('; ');
+}
+
+/**
+ * Убирает из объекта записи ключи персональных полей перед отправкой в LLM.
+ * @param {Record<string, unknown>} bookingLike
+ * @param {Set<string>} redactedKeys
+ */
+function sanitizeBookingForLlm(bookingLike, redactedKeys) {
+  const out = { ...bookingLike };
+  for (const k of redactedKeys) delete out[k];
+  return out;
 }
 
 /** @param {import('@prisma/client').Booking} row */
@@ -211,11 +235,12 @@ function rowMatchesQuery(data, q) {
 /**
  * @param {import('@prisma/client').PrismaClient} prisma
  * @param {string} userId
- * @param {Set<string>} allowedKeys
+ * @param {Set<string>} writableKeys — без полей типа client
+ * @param {Set<string>} redactedKeys — ключи client, вырезаются из ответов инструментов
  * @param {string} name
  * @param {unknown} rawArgs
  */
-async function executeTool(prisma, userId, allowedKeys, name, rawArgs) {
+async function executeTool(prisma, userId, writableKeys, redactedKeys, name, rawArgs) {
   let args = /** @type {Record<string, unknown>} */ ({});
   if (typeof rawArgs === 'string') {
     try {
@@ -247,8 +272,9 @@ async function executeTool(prisma, userId, allowedKeys, name, rawArgs) {
       delete dataOnly.id;
       delete dataOnly.createdAt;
       delete dataOnly.updatedAt;
+      for (const k of redactedKeys) delete dataOnly[k];
       if (!rowMatchesQuery(dataOnly, query)) continue;
-      out.push(api);
+      out.push(sanitizeBookingForLlm(api, redactedKeys));
       if (out.length >= limit) break;
     }
     return { ok: true, bookings: out, count: out.length };
@@ -259,7 +285,7 @@ async function executeTool(prisma, userId, allowedKeys, name, rawArgs) {
     if (!id) return { ok: false, error: 'id required' };
     const row = await prisma.booking.findFirst({ where: { id, userId } });
     if (!row) return { ok: false, error: 'not_found' };
-    return { ok: true, booking: rowToApi(row) };
+    return { ok: true, booking: sanitizeBookingForLlm(rowToApi(row), redactedKeys) };
   }
 
   if (name === 'create_booking') {
@@ -269,14 +295,14 @@ async function executeTool(prisma, userId, allowedKeys, name, rawArgs) {
     const data = {};
     for (const [k, v] of Object.entries(fields)) {
       if (k === 'id' || k === 'createdAt' || k === 'updatedAt') continue;
-      if (allowedKeys.has(k)) data[k] = v;
+      if (writableKeys.has(k)) data[k] = v;
     }
     if (data.date != null && typeof data.date === 'string') data.date = data.date.trim();
     try {
       const row = await prisma.booking.create({
         data: { id, userId, data },
       });
-      return { ok: true, booking: rowToApi(row) };
+      return { ok: true, booking: sanitizeBookingForLlm(rowToApi(row), redactedKeys) };
     } catch (e) {
       const code = e && typeof e === 'object' && 'code' in e ? e.code : '';
       return { ok: false, error: String(e?.message || e), code: String(code) };
@@ -294,14 +320,14 @@ async function executeTool(prisma, userId, allowedKeys, name, rawArgs) {
     const base = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? { ...raw } : {};
     for (const [k, v] of Object.entries(fields)) {
       if (k === 'id' || k === 'createdAt' || k === 'updatedAt') continue;
-      if (allowedKeys.has(k)) base[k] = v;
+      if (writableKeys.has(k)) base[k] = v;
     }
     if (base.date != null && typeof base.date === 'string') base.date = base.date.trim();
     const row = await prisma.booking.update({
       where: { id },
       data: { data: base, updatedAt: new Date() },
     });
-    return { ok: true, booking: rowToApi(row) };
+    return { ok: true, booking: sanitizeBookingForLlm(rowToApi(row), redactedKeys) };
   }
 
   if (name === 'delete_booking') {
@@ -411,13 +437,14 @@ export async function handleAssistantChat(prisma, req, res) {
 
   const modelId = (process.env.ASSISTANT_MODEL ?? '').trim() || DEFAULT_MODEL;
   const assistantTz = resolveAssistantTimeZone(body.timezone ?? body.timeZone);
-  const allowedKeys = await loadAllowedFieldKeys(prisma, userId);
+  const { writableKeys, redactedKeys } = await loadAssistantFieldKeySets(prisma, userId);
   const fieldsSummary = await buildFieldsSummary(prisma, userId);
 
   const systemContent = [
     buildClockContextBlock(assistantTz),
     '',
     'Ты помощник в приложении Base56: записи клиентов (брони) с настраиваемыми полями.',
+    'Персональное поле «Клиент» (тип client в БД) никогда не передаётся в модель и недоступно инструментам; не проси ФИО/телефон для записи в чат — пользователь заполняет это в интерфейсе.',
     'Поле даты записи: ключ date, формат YYYY-MM-DD.',
     `Доступные ключи полей пользователя: ${fieldsSummary}`,
     'Вызывай инструменты для чтения и изменения данных; не выдумывай id записей — получай их из list_bookings или get_booking.',
@@ -529,7 +556,7 @@ export async function handleAssistantChat(prisma, req, res) {
       } catch {
         argsObj = {};
       }
-      const result = await executeTool(prisma, userId, allowedKeys, p.name, argsObj);
+      const result = await executeTool(prisma, userId, writableKeys, redactedKeys, p.name, argsObj);
       messages.push({
         role: 'tool',
         tool_call_id: p.id,
