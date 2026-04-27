@@ -49,6 +49,12 @@ export function createSessionMiddleware() {
   /** В production без HTTPS cookie с secure:true не уходит в браузер — разрешаем выключить. */
   const cookieSecure =
     process.env.SESSION_COOKIE_SECURE === '0' ? false : Boolean(isProd);
+  const cookieDomain = (process.env.SESSION_COOKIE_DOMAIN ?? '').trim() || undefined;
+  const sameSiteRaw = (process.env.SESSION_COOKIE_SAMESITE ?? '').trim().toLowerCase();
+  /** @type {import('express-session').CookieOptions['sameSite']} */
+  const sameSite =
+    sameSiteRaw === 'none' ? 'none' : sameSiteRaw === 'strict' ? 'strict' : 'lax';
+  const effectiveSecure = sameSite === 'none' ? true : cookieSecure;
 
   const base = {
     secret,
@@ -59,8 +65,9 @@ export function createSessionMiddleware() {
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      secure: cookieSecure,
-      sameSite: 'lax',
+      secure: effectiveSecure,
+      sameSite,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     },
   };
 

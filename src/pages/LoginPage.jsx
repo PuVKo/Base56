@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PasswordInput } from '@/components/PasswordInput.jsx';
 import { apiFetch } from '@/lib/api';
+import { loginFormSchema } from '@/lib/validation';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -15,10 +16,15 @@ export default function LoginPage() {
   async function onSubmit(e) {
     e.preventDefault();
     setError('');
+    const parsed = loginFormSchema.safeParse({ identifier, password });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || 'Некорректные данные');
+      return;
+    }
     try {
       await apiFetch('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify(parsed.data),
       });
       const raw = params.get('redirect');
       const safe =

@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from 'crypto';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
+import { z } from 'zod';
 import { sendTransactionalMail } from './mail.js';
 import { resetPasswordFields, verifyEmailFields } from './mailTemplates.js';
 
@@ -43,6 +44,38 @@ function loginFormatValid(s) {
   const t = normalizeLoginKey(s);
   return /^[a-z0-9_]{2,32}$/.test(t);
 }
+
+function badRequest(res, msg = 'Некорректные данные') {
+  res.status(400).json({ error: msg });
+}
+
+const RegisterBody = z
+  .object({
+    email: z.string().trim().toLowerCase().max(200),
+    password: z.string().min(8).max(200),
+    login: z.string().trim().toLowerCase().max(32).optional(),
+  })
+  .strict();
+
+const LoginBody = z
+  .object({
+    identifier: z.string().trim().min(1).max(200),
+    password: z.string().min(1).max(200),
+  })
+  .strict();
+
+const EmailOnlyBody = z
+  .object({
+    email: z.string().trim().toLowerCase().max(200),
+  })
+  .strict();
+
+const ResetPasswordBody = z
+  .object({
+    token: z.string().trim().min(1).max(500),
+    password: z.string().min(8).max(200),
+  })
+  .strict();
 
 /**
  * Локальная часть email → логин [a-z0-9_]{2,32}; иначе null (слишком коротко или пусто после очистки).
@@ -141,20 +174,22 @@ export function mountAuthRoutes(app, prisma, hooks) {
 
   app.post('/api/auth/register', registerLimiter, async (req, res) => {
     try {
-      const email = normalizeEmail(req.body?.email);
-      const password = String(req.body?.password ?? '');
-      if (!emailLooksValid(email)) {
-        res.status(400).json({ error: 'Некорректный email' });
+      const parsed = RegisterBody.safeParse(req.body);
+      if (!parsed.success) {
+        badRequest(res);
         return;
       }
-      if (password.length < 8) {
-        res.status(400).json({ error: 'Пароль не короче 8 символов' });
+      const email = normalizeEmail(parsed.data.email);
+      const password = parsed.data.password;
+      if (!emailLooksValid(email)) {
+        res.status(400).json({ error: 'Некорректный email' });
         return;
       }
 
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing?.emailVerifiedAt) {
-        res.status(409).json({ error: 'Этот email уже зарегистрирован' });
+        // Anti-enumeration: не раскрываем, есть ли аккаунт.
+        res.json({ ok: true, message: 'Если email свободен, мы отправили ссылку для подтверждения.' });
         return;
       }
       if (existing && !existing.emailVerifiedAt) {
@@ -162,7 +197,7 @@ export function mountAuthRoutes(app, prisma, hooks) {
         await prisma.user.deleteMany({ where: { id: existing.id } });
       }
 
-      const rawLogin = req.body?.login;
+      const rawLogin = parsed.data.login;
       /** @type {string | null} */
       let loginToSet = null;
       if (rawLogin != null && String(rawLogin).trim() !== '') {
@@ -220,7 +255,7 @@ export function mountAuthRoutes(app, prisma, hooks) {
       res.json({ ok: true, message: 'Проверьте почту для подтверждения' });
     } catch (e) {
       if (e.code === 'P2002') {
-        res.status(409).json({ error: 'Повторите попытку регистрации' });
+        res.status(409).json({ error: 'Повторите попытку' });
         return;
       }
       console.error(e);
@@ -230,8 +265,13 @@ export function mountAuthRoutes(app, prisma, hooks) {
 
   app.post('/api/auth/login', loginLimiter, async (req, res) => {
     try {
-      const raw = String(req.body?.identifier ?? req.body?.email ?? '').trim();
-      const password = String(req.body?.password ?? '');
+      const parsed = LoginBody.safeParse(req.body);
+      if (!parsed.success) {
+        badRequest(res);
+        return;
+      }
+      const raw = parsed.data.identifier;
+      const password = parsed.data.password;
       /** @type {import('@prisma/client').User | null} */
       let user = null;
       if (raw.includes('@')) {
@@ -341,7 +381,12 @@ export function mountAuthRoutes(app, prisma, hooks) {
 
   app.post('/api/auth/forgot-password', forgotLimiter, async (req, res) => {
     try {
-      const email = normalizeEmail(req.body?.email);
+      const parsed = EmailOnlyBody.safeParse(req.body);
+      if (!parsed.success) {
+        res.json({ ok: true });
+        return;
+      }
+      const email = normalizeEmail(parsed.data.email);
       if (!emailLooksValid(email)) {
         res.json({ ok: true });
         return;
@@ -393,16 +438,13 @@ export function mountAuthRoutes(app, prisma, hooks) {
 
   app.post('/api/auth/reset-password', async (req, res) => {
     try {
-      const raw = String(req.body?.token ?? '').trim();
-      const password = String(req.body?.password ?? '');
-      if (!raw) {
-        res.status(400).json({ error: 'token required' });
+      const parsed = ResetPasswordBody.safeParse(req.body);
+      if (!parsed.success) {
+        badRequest(res);
         return;
       }
-      if (password.length < 8) {
-        res.status(400).json({ error: 'Пароль не короче 8 символов' });
-        return;
-      }
+      const raw = parsed.data.token;
+      const password = parsed.data.password;
 
       const tokenHash = hashToken(raw);
       const row = await prisma.authToken.findFirst({
@@ -439,7 +481,12 @@ export function mountAuthRoutes(app, prisma, hooks) {
 
   app.post('/api/auth/resend-verification', forgotLimiter, async (req, res) => {
     try {
-      const email = normalizeEmail(req.body?.email);
+      const parsed = EmailOnlyBody.safeParse(req.body);
+      if (!parsed.success) {
+        res.json({ ok: true });
+        return;
+      }
+      const email = normalizeEmail(parsed.data.email);
       if (!emailLooksValid(email)) {
         res.json({ ok: true });
         return;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PasswordInput } from '@/components/PasswordInput.jsx';
 import { apiFetch } from '@/lib/api';
+import { resetPasswordSchema } from '@/lib/validation';
 
 export default function ResetPasswordPage() {
   const [params] = useSearchParams();
@@ -13,10 +14,15 @@ export default function ResetPasswordPage() {
   async function onSubmit(e) {
     e.preventDefault();
     setError('');
+    const parsed = resetPasswordSchema.safeParse({ token, password });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || 'Некорректные данные');
+      return;
+    }
     try {
       await apiFetch('/api/auth/reset-password', {
         method: 'POST',
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify(parsed.data),
       });
       setOk(true);
     } catch (err) {

@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { prisma } from './db.js';
 import { handleAssistantChat } from './assistantOpenRouter.js';
@@ -36,7 +37,10 @@ function resolveCorsOrigins() {
     .filter(Boolean);
   const single = (process.env.APP_PUBLIC_URL ?? '').trim().replace(/\/$/, '');
   const fromPublic = single ? [single] : [];
-  return [...new Set([...defaults, ...extraList, ...fromPublic])];
+  const allowLocal = (process.env.CORS_ALLOW_LOCALHOST ?? '').trim() !== '0';
+  const base = allowLocal ? defaults : [];
+  const merged = [...new Set([...base, ...extraList, ...fromPublic])];
+  return merged;
 }
 
 const OPTION_COLORS = new Set(['gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red']);
@@ -240,7 +244,36 @@ async function backfillLegacyFieldOptions(userId) {
 
 const app = express();
 app.set('trust proxy', 1);
-app.use(cors({ origin: resolveCorsOrigins(), credentials: true }));
+app.disable('x-powered-by');
+
+const corsOrigins = resolveCorsOrigins();
+const isProd = process.env.NODE_ENV === 'production';
+if (isProd && corsOrigins.length === 0) {
+  console.warn(
+    '[Base56] WARN: CORS origins пусты в production. Задайте APP_PUBLIC_URL и/или CORS_ORIGINS.',
+  );
+}
+
+app.use(
+  helmet({
+    // CSP лучше настраивать под реальную схему статики/скриптов. Пока не ломаем dev/preview.
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // same-origin / curl / server-to-server
+      if (!origin) return callback(null, true);
+      const o = String(origin).replace(/\/$/, '');
+      if (corsOrigins.includes(o)) return callback(null, true);
+      return callback(new Error('CORS: origin not allowed'), false);
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json({ limit: '20mb' }));
 
 /** До session: иначе health проходит через connect-pg-simple и может зависнуть на БД → деплой без конца. */

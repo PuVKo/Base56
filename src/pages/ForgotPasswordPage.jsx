@@ -1,15 +1,23 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
+import { forgotPasswordSchema } from '@/lib/validation';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
   async function onSubmit(e) {
     e.preventDefault();
+    setError('');
+    const parsed = forgotPasswordSchema.safeParse({ email });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || 'Некорректные данные');
+      return;
+    }
     try {
-      await apiFetch('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+      await apiFetch('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify(parsed.data) });
     } catch {
       /* всегда показываем успех */
     }
@@ -41,6 +49,7 @@ export default function ForgotPasswordPage() {
                 required
               />
             </div>
+            {error ? <p className="text-sm text-rose-300">{error}</p> : null}
             <button
               type="submit"
               className="w-full rounded-lg bg-white text-notion-bg py-2.5 text-sm font-medium hover:bg-white/90 transition-colors"

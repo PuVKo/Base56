@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PasswordInput } from '@/components/PasswordInput.jsx';
 import { apiFetch } from '@/lib/api';
+import { registerSchema } from '@/lib/validation';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -17,14 +18,21 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     setResendMsg('');
+    const parsed = registerSchema.safeParse({ email, login, password });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || 'Некорректные данные');
+      return;
+    }
     setSubmitting(true);
     try {
       await apiFetch('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify({
-          email,
-          password,
-          ...(login.trim() ? { login: login.trim() } : {}),
+          email: parsed.data.email,
+          password: parsed.data.password,
+          ...(parsed.data.login && String(parsed.data.login).trim()
+            ? { login: String(parsed.data.login).trim() }
+            : {}),
         }),
       });
       setDone(true);
