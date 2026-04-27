@@ -9,8 +9,17 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { prisma } from './db.js';
 import { handleAssistantChat } from './assistantOpenRouter.js';
+import {
+  parseBookingCreateBody,
+  parseBookingUpdateBody,
+  parseFieldCreateBody,
+  parseFieldPatchBody,
+  parseFieldReorderBody,
+} from './apiSchemas.js';
 import { mountAuthRoutes } from './authRoutes.js';
+import { ensureCsrfToken, requireCsrfUnlessExempt } from './csrf.js';
 import { isRusenderConfigured, isSmtpConfigured } from './mail.js';
+import { sendServerError } from './httpError.js';
 import { createSessionMiddleware, requireAuth } from './session.js';
 import { normalizeClientUi } from './userClientUi.js';
 
@@ -26,7 +35,6 @@ const webDistPath = path.join(serverSrcDir, '..', '..', 'dist');
 const PORT = Number(process.env.PORT) || 8080;
 /** В контейнере healthcheck идёт не на 127.0.0.1 — по умолчанию слушаем все интерфейсы. Локально: LISTEN_HOST=127.0.0.1 */
 const LISTEN_HOST = (process.env.LISTEN_HOST ?? '').trim() || '0.0.0.0';
-const ADMIN_RESET_SECRET = process.env.ADMIN_RESET_SECRET?.trim();
 
 /** Локальная разработка + CORS_ORIGINS (через запятую) + APP_PUBLIC_URL (один origin). */
 function resolveCorsOrigins() {
@@ -113,21 +121,6 @@ const DEFAULT_FIELDS = [
     options: null,
   },
 ];
-
-const ADDABLE_FIELD_TYPES = new Set([
-  'text',
-  'textarea',
-  'number',
-  'date',
-  'time',
-  'email',
-  'phone',
-  'client',
-  'url',
-  'checkbox',
-  'select',
-  'multiselect',
-]);
 
 function fieldSupportsOptions(type) {
   return type === 'select' || type === 'multiselect' || type === 'status' || type === 'tags' || type === 'source';
@@ -254,13 +247,40 @@ if (isProd && corsOrigins.length === 0) {
   );
 }
 
-app.use(
-  helmet({
-    // CSP лучше настраивать под реальную схему статики/скриптов. Пока не ломаем dev/preview.
-    contentSecurityPolicy: false,
+/** CSP: в production включено по умолчанию; локально — CSP_ENABLED=1. Отключить: CSP_ENABLED=0. */
+function createHelmetMiddleware() {
+  const raw = (process.env.CSP_ENABLED ?? '').trim().toLowerCase();
+  const cspOn = raw === '1' || (raw !== '0' && process.env.NODE_ENV === 'production');
+  if (!cspOn) {
+    return helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    });
+  }
+  /** @type {Record<string, string[] | string[][]>} */
+  const directives = {
+    defaultSrc: ["'self'"],
+    baseUri: ["'self'"],
+    scriptSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+    fontSrc: ["'self'", 'data:'],
+    connectSrc: ["'self'"],
+    frameAncestors: ["'none'"],
+    formAction: ["'self'"],
+    objectSrc: ["'none'"],
+  };
+  const pub = (process.env.APP_PUBLIC_URL ?? '').trim();
+  if (pub.startsWith('https://')) {
+    directives.upgradeInsecureRequests = [];
+  }
+  return helmet({
+    contentSecurityPolicy: { directives },
     crossOriginEmbedderPolicy: false,
-  }),
-);
+  });
+}
+
+app.use(createHelmetMiddleware());
 
 app.use(
   cors({
@@ -282,7 +302,9 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use(createSessionMiddleware());
+app.use(ensureCsrfToken);
 mountAuthRoutes(app, prisma, { ensureDefaultFieldsForUser: ensureDefaultFields });
+app.use(requireCsrfUnlessExempt);
 
 const assistantLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -295,9 +317,8 @@ app.post('/api/assistant/chat', assistantLimiter, requireAuth, async (req, res) 
   try {
     await handleAssistantChat(prisma, req, res);
   } catch (e) {
-    console.error(e);
     if (!res.headersSent) {
-      res.status(500).json({ error: String(e?.message || e) });
+      sendServerError(res, e);
     }
   }
 });
@@ -310,26 +331,18 @@ app.get('/api/fields', requireAuth, async (req, res) => {
     });
     res.json(rows);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 
 app.post('/api/fields', requireAuth, async (req, res) => {
   try {
-    const { label, type, visible = true, iconKey, options: optionsBody } = req.body;
-    if (!label || typeof label !== 'string') {
-      res.status(400).json({ error: 'label required' });
+    const parsed = parseFieldCreateBody(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
-    if (!ADDABLE_FIELD_TYPES.has(type)) {
-      res.status(400).json({ error: 'invalid type' });
-      return;
-    }
-    if (iconKey !== undefined && iconKey !== null && typeof iconKey !== 'string') {
-      res.status(400).json({ error: 'invalid iconKey' });
-      return;
-    }
+    const { label, type, visible = true, iconKey, options: optionsBody } = parsed.data;
     let options = null;
     if (type === 'select' || type === 'multiselect') {
       const n = normalizeOptionsPayload(optionsBody);
@@ -362,15 +375,19 @@ app.post('/api/fields', requireAuth, async (req, res) => {
     });
     res.json(row);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 
 app.patch('/api/fields/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { label, visible, sortOrder, iconKey, options: optionsBody } = req.body;
+    const parsed = parseFieldPatchBody(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
+    const { label, visible, sortOrder, iconKey, options: optionsBody } = parsed.data;
     const existing = await prisma.fieldDefinition.findFirst({ where: { id, userId: req.userId } });
     if (!existing) {
       res.status(404).json({ error: 'not found' });
@@ -407,8 +424,7 @@ app.patch('/api/fields/:id', requireAuth, async (req, res) => {
     const row = await prisma.fieldDefinition.update({ where: { id }, data });
     res.json(row);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 
@@ -428,18 +444,18 @@ app.delete('/api/fields/:id', requireAuth, async (req, res) => {
     await prisma.fieldDefinition.delete({ where: { id } });
     res.json({ ok: true });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 
 app.put('/api/fields/reorder', requireAuth, async (req, res) => {
   try {
-    const { ids } = req.body;
-    if (!Array.isArray(ids)) {
-      res.status(400).json({ error: 'ids array required' });
+    const parsed = parseFieldReorderBody(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
+    const { ids } = parsed.data;
     const owned = await prisma.fieldDefinition.count({
       where: { userId: req.userId, id: { in: ids } },
     });
@@ -461,8 +477,7 @@ app.put('/api/fields/reorder', requireAuth, async (req, res) => {
     });
     res.json(rows);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 
@@ -478,8 +493,7 @@ app.get('/api/bookings', requireAuth, async (req, res) => {
     });
     res.json(list);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 
@@ -494,8 +508,7 @@ app.get('/api/user/ui-prefs', requireAuth, async (req, res) => {
     const clientUi = normalizeClientUi(persisted ? raw : undefined);
     res.json({ clientUi, persisted });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message || e) });
+    sendServerError(res, e);
   }
 });
 
@@ -509,18 +522,18 @@ app.put('/api/user/ui-prefs', requireAuth, async (req, res) => {
     });
     res.json(clientUi);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message || e) });
+    sendServerError(res, e);
   }
 });
 
 app.post('/api/bookings', requireAuth, async (req, res) => {
   try {
-    const b = req.body;
-    if (!b?.id) {
-      res.status(400).json({ error: 'id required' });
+    const parsed = parseBookingCreateBody(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
+    const b = parsed.data;
     const { id, createdAt, updatedAt, ...rest } = b;
     if (rest.date != null && typeof rest.date === 'string') {
       rest.date = rest.date.trim();
@@ -543,15 +556,19 @@ app.post('/api/bookings', requireAuth, async (req, res) => {
       res.status(409).json({ error: 'already exists' });
       return;
     }
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 
 app.put('/api/bookings/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const b = req.body;
+    const parsed = parseBookingUpdateBody(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
+    const b = parsed.data;
     const { id: _i, createdAt, updatedAt, ...rest } = b;
     const hit = await prisma.booking.findFirst({ where: { id, userId: req.userId } });
     if (!hit) {
@@ -568,8 +585,7 @@ app.put('/api/bookings/:id', requireAuth, async (req, res) => {
     const d = typeof row.data === 'object' && row.data !== null ? row.data : {};
     res.json({ ...d, id: row.id, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 
@@ -587,205 +603,22 @@ app.delete('/api/bookings/:id', requireAuth, async (req, res) => {
       res.status(404).json({ error: 'not found' });
       return;
     }
-    console.error(e);
-    res.status(500).json({ error: String(e?.message || e) });
+    sendServerError(res, e);
   }
 });
 
-/** Удаляет все заказы текущего пользователя (поля не трогает). При ADMIN_RESET_SECRET нужен заголовок X-Admin-Reset-Secret. */
-app.post('/api/admin/reset-bookings', requireAuth, async (req, res) => {
+/** Удаляет все заказы текущего пользователя (определения полей не меняет). */
+app.post('/api/bookings/clear', requireAuth, async (req, res) => {
   try {
     const body = typeof req.body === 'object' && req.body !== null ? req.body : {};
     if (body.confirm !== true) {
       res.status(400).json({ error: 'В теле запроса укажите { "confirm": true }' });
       return;
     }
-    if (ADMIN_RESET_SECRET) {
-      const h = String(req.headers['x-admin-reset-secret'] ?? '');
-      if (h !== ADMIN_RESET_SECRET) {
-        res.status(403).json({ error: 'Неверный секрет сброса' });
-        return;
-      }
-    }
     const r = await prisma.booking.deleteMany({ where: { userId: req.userId } });
     res.json({ ok: true, deleted: r.count });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
-
-function ymdYear(ymd) {
-  const s = String(ymd ?? '').trim();
-  const m = s.match(/^(\d{4})-\d{2}-\d{2}$/);
-  return m ? Number(m[1]) : NaN;
-}
-
-app.get('/api/admin/export-dump', requireAuth, async (req, res) => {
-  try {
-    const qYear = req.query?.year != null ? Number(req.query.year) : NaN;
-    const year = Number.isFinite(qYear) ? qYear : NaN;
-
-    const fields = await prisma.fieldDefinition.findMany({
-      where: { userId: req.userId },
-      orderBy: { sortOrder: 'asc' },
-    });
-    const bookingRows = await prisma.booking.findMany({
-      where: { userId: req.userId },
-      orderBy: { updatedAt: 'desc' },
-    });
-    const bookings = bookingRows
-      .map((r) => {
-        const d = typeof r.data === 'object' && r.data !== null ? r.data : {};
-        return { ...d, id: r.id, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString() };
-      })
-      .filter((b) => {
-        if (!Number.isFinite(year)) return true;
-        return ymdYear(b.date) === year;
-      });
-
-    const urow = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { uiPrefs: true },
-    });
-    const clientUi = normalizeClientUi(
-      urow?.uiPrefs != null && typeof urow.uiPrefs === 'object' ? urow.uiPrefs : undefined,
-    );
-
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="base56_dump${Number.isFinite(year) ? `_${year}` : ''}.json"`,
-    );
-    res.end(
-      JSON.stringify({
-        ok: true,
-        year: Number.isFinite(year) ? year : null,
-        fields,
-        bookings,
-        clientUi,
-      }),
-    );
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
-
-app.post('/api/admin/import-dump', requireAuth, async (req, res) => {
-  try {
-    const body = typeof req.body === 'object' && req.body !== null ? req.body : {};
-    const { fields, bookings, overwrite, clientUi: clientUiBody } = body;
-    if (!Array.isArray(fields) || !Array.isArray(bookings)) {
-      res.status(400).json({ error: 'fields and bookings arrays required' });
-      return;
-    }
-
-    const uid = req.userId;
-    const existing = await prisma.booking.count({ where: { userId: uid } });
-    if (existing > 0 && overwrite !== true) {
-      res.status(400).json({ error: 'database already has bookings (pass overwrite=true to replace)' });
-      return;
-    }
-
-    if (overwrite === true) {
-      await prisma.booking.deleteMany({ where: { userId: uid } });
-      await prisma.fieldDefinition.deleteMany({ where: { userId: uid } });
-    }
-
-    /** Все занятые PK — иначе два поля в дампе с одним id дают P2002 на `id`. */
-    const takenFieldIds = new Set(
-      (await prisma.fieldDefinition.findMany({ select: { id: true } })).map((r) => r.id),
-    );
-
-    // Fields: create in given order; keep ids if свободны (cuid из экспорта).
-    for (const f of fields) {
-      if (!f || typeof f !== 'object') continue;
-      const { id, key, label, type, sortOrder, system, visible, options, iconKey } = f;
-      if (!key || !label || !type) continue;
-      const k = String(key);
-      const wantId = id && typeof id === 'string' && id.trim() ? id.trim() : '';
-      const useCustomId = Boolean(wantId && !takenFieldIds.has(wantId));
-
-      const row = await prisma.fieldDefinition.upsert({
-        where: { userId_key: { userId: uid, key: k } },
-        update: {
-          label: String(label),
-          type: String(type),
-          sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
-          system: Boolean(system),
-          visible: visible !== undefined ? Boolean(visible) : true,
-          options: options ?? null,
-          iconKey: iconKey !== undefined ? (iconKey === null || iconKey === '' ? null : String(iconKey)) : undefined,
-        },
-        create: {
-          ...(useCustomId ? { id: wantId } : {}),
-          userId: uid,
-          key: k,
-          label: String(label),
-          type: String(type),
-          sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
-          system: Boolean(system),
-          visible: visible !== undefined ? Boolean(visible) : true,
-          options: options ?? null,
-          iconKey:
-            iconKey !== undefined && iconKey !== null && String(iconKey).trim()
-              ? String(iconKey).trim()
-              : null,
-        },
-      });
-      takenFieldIds.add(row.id);
-    }
-
-    // Bookings: как /api/bookings/migrate; если нет id — новый uuid (старые дампы / ручное редактирование).
-    // Если id занят у другого пользователя — импортируем с новым id (дамп не обязан быть "для того же userId").
-    let created = 0;
-    let bookingIdsGenerated = 0;
-    let bookingIdsReplacedDueToConflict = 0;
-    for (const b of bookings) {
-      if (!b || typeof b !== 'object') continue;
-      const { id: bodyId, createdAt, updatedAt, ...rest } = b;
-      const rawId = bodyId != null ? String(bodyId).trim() : '';
-      let id = rawId || randomUUID();
-      if (!rawId) bookingIdsGenerated += 1;
-      const meta = {};
-      if (createdAt) meta.createdAt = new Date(createdAt);
-      if (updatedAt) meta.updatedAt = new Date(updatedAt);
-      const exB = await prisma.booking.findUnique({ where: { id } });
-      if (exB && exB.userId !== uid) {
-        let guard = 0;
-        do {
-          id = randomUUID();
-          guard += 1;
-        } while (guard < 8 && (await prisma.booking.findUnique({ where: { id } })));
-        bookingIdsReplacedDueToConflict += 1;
-      }
-      await prisma.booking.upsert({
-        where: { id },
-        update: { data: rest, updatedAt: new Date() },
-        create: { id, userId: uid, data: rest, ...meta },
-      });
-      created += 1;
-    }
-
-    if (clientUiBody != null && typeof clientUiBody === 'object') {
-      await prisma.user.update({
-        where: { id: uid },
-        data: { uiPrefs: normalizeClientUi(clientUiBody) },
-      });
-    }
-
-    res.json({
-      ok: true,
-      fields: fields.length,
-      bookings: created,
-      bookingsInPayload: bookings.length,
-      bookingIdsGenerated,
-      bookingIdsReplacedDueToConflict,
-    });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message || e) });
+    sendServerError(res, e);
   }
 });
 
@@ -826,8 +659,7 @@ app.post('/api/bookings/migrate', requireAuth, async (req, res) => {
     });
     res.json({ count: list.length, bookings: list });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message) });
+    sendServerError(res, e);
   }
 });
 

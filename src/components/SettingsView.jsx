@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ChevronRight,
   CreditCard,
-  Download,
   Eye,
   EyeOff,
   GripVertical,
@@ -12,10 +11,9 @@ import {
   Plus,
   Search,
   Trash2,
-  Upload,
   X,
 } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, invalidateCsrfToken } from '@/lib/api';
 import { ADDABLE_FIELD_TYPES } from '@/lib/fieldTypeMeta';
 import { getFieldTypeMeta } from '@/lib/fieldTypeMeta';
 import { fieldUsesOptionList, getFieldOptionItems } from '@/lib/fieldOptions';
@@ -51,6 +49,7 @@ function ProfileAccountPanel({ currentUser, flushNow }) {
     await flushNow();
     try {
       await apiFetch('/api/auth/logout', { method: 'POST' });
+      invalidateCsrfToken();
     } catch {
       /* ignore */
     }
@@ -130,7 +129,6 @@ function ProfileAccountPanel({ currentUser, flushNow }) {
  * @param {any[]} props.fields
  * @param {() => Promise<void>} props.onFieldsChange
  * @param {() => Promise<void>} props.refreshBookings
- * @param {() => Promise<void>} [props.refreshClientUi]
  * @param {number} [props.bookingCount]
  * @param {(id: string, partial: Record<string, unknown>) => void} props.patchFieldLocal
  * @param {(body: { label: string, type: string, iconKey: string | null }) => string} props.createFieldLocal
@@ -145,7 +143,6 @@ export function SettingsView({
   fields,
   onFieldsChange,
   refreshBookings,
-  refreshClientUi,
   bookingCount = 0,
   patchFieldLocal,
   createFieldLocal,
@@ -158,14 +155,8 @@ export function SettingsView({
 }) {
   const navigate = useNavigate();
   const [msg, setMsg] = useState('');
-  const [dumpYearKey, setDumpYearKey] = useState('');
-  const [dumpBusy, setDumpBusy] = useState(false);
-  const [dumpToast, setDumpToast] = useState(/** @type {{ message: string, variant: 'ok' | 'err' } | null} */ (null));
-  const dumpToastTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
-  const dumpImportRef = useRef(/** @type {HTMLInputElement | null} */ (null));
   const [resetBusy, setResetBusy] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const [importConfirmOpen, setImportConfirmOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [typeQuery, setTypeQuery] = useState('');
   const [nameModal, setNameModal] = useState(/** @type {{ type: string } | null} */ (null));
@@ -179,156 +170,16 @@ export function SettingsView({
 
   const sorted = useMemo(() => [...fields].sort((a, b) => a.sortOrder - b.sortOrder), [fields]);
 
-  const dumpYearOptions = useMemo(() => {
-    const y = new Date().getFullYear();
-    return Array.from({ length: 32 }, (_, i) => y - i);
-  }, []);
-
-  const DUMP_TOAST_MS = 5000;
-  const DUMP_TOAST_LONG_MS = 9000;
-
-  /**
-   * @param {string} message
-   * @param {'ok' | 'err'} [variant]
-   * @param {number} [durationMs]
-   */
-  function showDumpToast(message, variant = 'ok', durationMs = DUMP_TOAST_MS) {
-    if (dumpToastTimerRef.current) clearTimeout(dumpToastTimerRef.current);
-    setDumpToast({ message, variant });
-    dumpToastTimerRef.current = setTimeout(() => {
-      setDumpToast(null);
-      dumpToastTimerRef.current = null;
-    }, durationMs);
-  }
-
-  useEffect(
-    () => () => {
-      if (dumpToastTimerRef.current) clearTimeout(dumpToastTimerRef.current);
-    },
-    [],
-  );
-
   useEffect(() => {
-    if (!resetConfirmOpen && !importConfirmOpen) return;
+    if (!resetConfirmOpen) return;
     function onKey(e) {
       if (e.key !== 'Escape') return;
-      if (resetBusy || dumpBusy) return;
+      if (resetBusy) return;
       setResetConfirmOpen(false);
-      setImportConfirmOpen(false);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [resetConfirmOpen, importConfirmOpen, resetBusy, dumpBusy]);
-
-  async function exportDump() {
-    setDumpBusy(true);
-    setMsg('');
-    try {
-      const qs = dumpYearKey ? `?year=${encodeURIComponent(dumpYearKey)}` : '';
-      const res = await fetch(`/api/admin/export-dump${qs}`, { method: 'GET', credentials: 'include' });
-      if (!res.ok) throw new Error(res.statusText);
-      const text = await res.text();
-      const data = text ? JSON.parse(text) : {};
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `base56_dump${dumpYearKey ? `_${dumpYearKey}` : ''}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showDumpToast(
-        dumpYearKey
-          ? `Файл скачан. В выгрузку попали только записи за ${dumpYearKey} год — если за этот год заказов не было, в файле может не быть строк с заказами (остальные данные копии всё равно внутри файла).`
-          : 'Файл скачан. В нём колонки вашей таблицы, все заказы и настройки плиток (фильтры и панель) из этой вкладки браузера — сохраните файл в надёжное место.',
-        'ok',
-        dumpYearKey ? DUMP_TOAST_LONG_MS : DUMP_TOAST_MS,
-      );
-    } catch (e) {
-      showDumpToast(String(e?.message || e), 'err');
-    } finally {
-      setDumpBusy(false);
-    }
-  }
-
-  function openImportConfirm() {
-    const f = dumpImportRef.current?.files?.[0];
-    if (!f) {
-      showDumpToast('Выберите JSON-файл резервной копии.', 'err');
-      return;
-    }
-    setImportConfirmOpen(true);
-  }
-
-  async function executeImportDump() {
-    setImportConfirmOpen(false);
-    try {
-      await flushNow();
-    } catch (e) {
-      showDumpToast(String(e?.message || e), 'err');
-      return;
-    }
-    await importDump();
-  }
-
-  async function importDump() {
-    const f = dumpImportRef.current?.files?.[0];
-    if (!f) {
-      showDumpToast('Выберите JSON-файл резервной копии.', 'err');
-      return;
-    }
-    setDumpBusy(true);
-    setMsg('');
-    try {
-      const text = await f.text();
-      const parsed = text ? JSON.parse(text) : null;
-      const payload = {
-        fields: parsed?.fields ?? [],
-        bookings: parsed?.bookings ?? [],
-        overwrite: true,
-        clientUi: parsed?.clientUi,
-      };
-      const res = await apiFetch('/api/admin/import-dump', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      await onFieldsChange();
-      await refreshBookings();
-      if (refreshClientUi) await refreshClientUi();
-      const fieldsCount = Number(res.fields ?? 0);
-      const n = Number(res.bookings ?? 0);
-      const total = Number(res.bookingsInPayload ?? n);
-      const gen = Number(res.bookingIdsGenerated ?? 0);
-      const repl = Number(res.bookingIdsReplacedDueToConflict ?? 0);
-      const parts = [
-        `Импорт из файла завершён. В аккаунте сейчас ${fieldsCount} колонок в таблице заказа и ${n} записей в календаре (по данным из файла).`,
-      ];
-      if (total === 0) {
-        parts.push(
-          'В файле не было ни одной записи заказа — часто так бывает, если при выгрузке выбрали год без заказов или в резервной копии не сохранялись строки таблицы.',
-        );
-      } else {
-        if (gen > 0) {
-          parts.push(
-            `У ${gen} записей в файле не было служебного номера — приложение присвоило новые номера; сами поля (дата, клиент, сумма и т.д.) не менялись.`,
-          );
-        }
-        if (repl > 0) {
-          parts.push(
-            `У ${repl} записей номер совпадал с уже существующими в базе — чтобы ничего не затереть, им выданы новые номера, содержимое строк из файла сохранено.`,
-          );
-        }
-      }
-      const importMsg = parts.join(' ');
-      showDumpToast(importMsg, 'ok', importMsg.length > 160 ? DUMP_TOAST_LONG_MS : DUMP_TOAST_MS);
-    } catch (e) {
-      showDumpToast(String(e?.message || e), 'err');
-    } finally {
-      setDumpBusy(false);
-      if (dumpImportRef.current) dumpImportRef.current.value = '';
-    }
-  }
+  }, [resetConfirmOpen, resetBusy]);
 
   useEffect(() => {
     function onDoc(e) {
@@ -371,14 +222,14 @@ export function SettingsView({
     setMsg('');
     try {
       await flushNow();
-      const data = await apiFetch('/api/admin/reset-bookings', {
+      const data = await apiFetch('/api/bookings/clear', {
         method: 'POST',
         body: JSON.stringify({ confirm: true }),
       });
       await refreshBookings();
       setMsg(`База заказов очищена. Удалено записей: ${data.deleted ?? 0}.`);
-    } catch (e) {
-      setMsg(String(e?.message || e));
+    } catch {
+      setMsg('Не удалось очистить заказы. Попробуйте ещё раз или обновите страницу.');
     } finally {
       setResetBusy(false);
     }
@@ -427,6 +278,7 @@ export function SettingsView({
     await flushNow();
     try {
       await apiFetch('/api/auth/logout', { method: 'POST' });
+      invalidateCsrfToken();
     } catch {
       /* ignore */
     }
@@ -470,8 +322,8 @@ export function SettingsView({
           Здесь вы настраиваете поля в форме заказа. Ручка слева от строки — перетащите её, чтобы поменять порядок
           полей. По названию поля можно сменить подпись. У статуса, тегов и источника откройте «Варианты», чтобы
           задать или изменить список значений. Значок глаза убирает поле из формы (сами заказы при этом не удаляются).
-          Внизу — выгрузка и загрузка резервной копии в файл, а также сброс всех заказов. Поле «Дата» удалить нельзя:
-          без него не работает календарь.
+          Внизу можно навсегда удалить все свои заказы в аккаунте. Поле «Дата» удалить нельзя: без него не работает
+          календарь.
         </p>
         <button
           type="button"
@@ -693,100 +545,13 @@ export function SettingsView({
         ) : null}
       </div>
 
-      <div className="mt-8 space-y-4">
-        <div>
-          <p className="text-sm text-white font-medium">Дамп данных</p>
-          <p className="text-xs text-notion-muted mt-1 leading-relaxed">
-            Здесь вы скачиваете или поднимаете резервную копию: заказы, колонки таблицы и настройки галереи в этом
-            браузере. Файл лежит у вас на компьютере — им можно перенести данные на другое устройство или просто
-            сохранить «на всякий случай».
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-violet-500/25 bg-violet-950/15 p-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-200">
-              <Download className="w-4 h-4" aria-hidden />
-            </div>
-            <div className="min-w-0 flex-1 space-y-3">
-              <div>
-                <p className="text-sm font-medium text-white">Экспорт</p>
-                <p className="text-xs text-notion-muted mt-1 leading-relaxed">
-                  Сохраняет на диск файл JSON с вашей таблицей и заказами из этого браузера. В «Год в дампе»:
-                  «Все» — полная копия; если выбрать год — в файл попадут только заказы с датой в этом году.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <label className="flex flex-col gap-1.5 text-xs text-notion-muted sm:max-w-[12rem]">
-                  <span className="text-notion-muted/90">Год в дампе</span>
-                  <select
-                    value={dumpYearKey}
-                    onChange={(e) => setDumpYearKey(e.target.value)}
-                    disabled={dumpBusy}
-                    className="rounded-md border border-notion-border bg-notion-bg px-2 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-violet-500/50 w-full"
-                  >
-                    <option value="">Все</option>
-                    {dumpYearOptions.map((y) => (
-                      <option key={y} value={String(y)}>
-                        {y}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={dumpBusy || resetBusy}
-                  onClick={exportDump}
-                  className="w-full sm:w-auto shrink-0 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium disabled:opacity-40"
-                >
-                  {dumpBusy ? 'Экспорт…' : 'Скачать JSON'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/15 p-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-200">
-              <Upload className="w-4 h-4" aria-hidden />
-            </div>
-            <div className="min-w-0 flex-1 space-y-3">
-              <div>
-                <p className="text-sm font-medium text-white">Импорт</p>
-                <p className="text-xs text-notion-muted mt-1 leading-relaxed">
-                  Файл .json — тот, что скачивали здесь или на другом устройстве. После «Импортировать» откроется окно
-                  подтверждения: при согласии все текущие заказы и колонки таблицы в аккаунте удаляются и полностью
-                  заменяются данными из файла (как чистая установка из копии).
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <input
-                  ref={dumpImportRef}
-                  type="file"
-                  accept=".json,application/json"
-                  disabled={dumpBusy}
-                  className="text-xs text-notion-muted w-full min-w-0 sm:flex-1 file:mr-2 file:rounded file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-xs file:text-white"
-                />
-                <button
-                  type="button"
-                  disabled={dumpBusy}
-                  onClick={() => openImportConfirm()}
-                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-40 shrink-0"
-                >
-                  {dumpBusy ? 'Импорт…' : 'Импортировать'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div className="mt-8">
         <div className="rounded-xl border border-rose-500/25 bg-rose-950/15 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-sm text-white font-medium">Очистить заказы</p>
               <p className="text-xs text-notion-muted mt-1 leading-relaxed">
-                Навсегда удаляет все заказы в этом аккаунте; колонки таблицы не меняются.
+                Навсегда удаляет все ваши заказы в этом аккаунте; колонки таблицы и настройки полей не меняются.
               </p>
             </div>
             <button
@@ -960,69 +725,6 @@ export function SettingsView({
         </div>
       ) : null}
 
-      {importConfirmOpen ? (
-        <div className="fixed inset-0 z-[106] flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
-            aria-label="Закрыть подтверждение импорта"
-            disabled={dumpBusy}
-            onClick={() => {
-              if (!dumpBusy) setImportConfirmOpen(false);
-            }}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="import-dump-title"
-            className="relative z-[1] w-full max-w-sm rounded-xl border border-emerald-500/45 bg-[#252525] shadow-2xl p-4 ring-1 ring-black/40"
-          >
-            <h3 id="import-dump-title" className="text-sm font-semibold text-white">
-              Заменить данные из файла?
-            </h3>
-            <p className="text-xs text-notion-muted mt-2 leading-relaxed">
-              Все текущие заказы и колонки таблицы в этом аккаунте будут удалены и заново созданы из выбранного
-              JSON-файла. Отменить это действие будет нельзя.
-            </p>
-            <div className="mt-4 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-              <button
-                type="button"
-                disabled={dumpBusy}
-                onClick={() => setImportConfirmOpen(false)}
-                className="w-full sm:w-auto px-3 py-2 rounded-lg border border-notion-border text-sm text-notion-muted hover:bg-notion-hover hover:text-white disabled:opacity-40"
-              >
-                Отмена
-              </button>
-              <button
-                type="button"
-                disabled={dumpBusy}
-                onClick={() => void executeImportDump()}
-                className="w-full sm:w-auto px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-40"
-              >
-                {dumpBusy ? 'Импорт…' : 'Да, заменить'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {dumpToast ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed z-[100] bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 max-w-sm w-[min(22rem,calc(100vw-1.5rem))] md:bottom-6 md:right-6 pointer-events-none"
-        >
-          <div
-            className={`pointer-events-auto max-h-[min(70vh,20rem)] overflow-y-auto rounded-xl border px-4 py-3 text-sm leading-snug shadow-2xl backdrop-blur-md ${
-              dumpToast.variant === 'err'
-                ? 'border-rose-500/40 bg-rose-950/95 text-rose-50'
-                : 'border-emerald-500/40 bg-emerald-950/95 text-emerald-50'
-            }`}
-          >
-            {dumpToast.message}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

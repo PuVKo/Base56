@@ -2,8 +2,17 @@ import { randomBytes, createHash } from 'crypto';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { isProduction, sendServerError } from './httpError.js';
 import { sendTransactionalMail } from './mail.js';
 import { resetPasswordFields, verifyEmailFields } from './mailTemplates.js';
+
+function mail502Payload(mailErr) {
+  const detail = String(mailErr?.message || mailErr);
+  return {
+    error: isProduction ? 'Не удалось отправить письмо' : `Не удалось отправить письмо: ${detail}`,
+    code: 'MAIL_FAILED',
+  };
+}
 
 const VERIFY_TTL_MS = 72 * 60 * 60 * 1000;
 const RESET_TTL_MS = 48 * 60 * 60 * 1000;
@@ -142,6 +151,11 @@ export function mountAuthRoutes(app, prisma, hooks) {
     legacyHeaders: false,
   });
 
+  /** Токен для заголовка X-CSRF-Token на мутациях (после ensureCsrfToken в index.js). */
+  app.get('/api/auth/csrf', (req, res) => {
+    res.json({ csrfToken: String(req.session?.csrfToken ?? '') });
+  });
+
   app.get('/api/auth/me', async (req, res) => {
     try {
       const uid = req.session?.userId;
@@ -167,8 +181,7 @@ export function mountAuthRoutes(app, prisma, hooks) {
         },
       });
     } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: String(e?.message || e) });
+      sendServerError(res, e);
     }
   });
 
@@ -246,10 +259,7 @@ export function mountAuthRoutes(app, prisma, hooks) {
         });
       } catch (mailErr) {
         console.error('[mail] register', mailErr);
-        res.status(502).json({
-          error: `Не удалось отправить письмо: ${String(mailErr?.message || mailErr)}`,
-          code: 'MAIL_FAILED',
-        });
+        res.status(502).json(mail502Payload(mailErr));
         return;
       }
       res.json({ ok: true, message: 'Проверьте почту для подтверждения' });
@@ -258,8 +268,7 @@ export function mountAuthRoutes(app, prisma, hooks) {
         res.status(409).json({ error: 'Повторите попытку' });
         return;
       }
-      console.error(e);
-      res.status(500).json({ error: String(e?.message || e) });
+      sendServerError(res, e);
     }
   });
 
@@ -312,15 +321,14 @@ export function mountAuthRoutes(app, prisma, hooks) {
         },
       });
     } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: String(e?.message || e) });
+      sendServerError(res, e);
     }
   });
 
   app.post('/api/auth/logout', (req, res) => {
     req.session.destroy((err) => {
       if (err) {
-        res.status(500).json({ error: String(err.message) });
+        sendServerError(res, err);
         return;
       }
       res.clearCookie('base56.sid', { path: '/' });
@@ -374,8 +382,7 @@ export function mountAuthRoutes(app, prisma, hooks) {
 
       res.json({ ok: true });
     } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: String(e?.message || e) });
+      sendServerError(res, e);
     }
   });
 
@@ -420,18 +427,14 @@ export function mountAuthRoutes(app, prisma, hooks) {
         });
       } catch (mailErr) {
         console.error('[mail] forgot', mailErr);
-        res.status(502).json({
-          error: String(mailErr?.message || mailErr),
-          code: 'MAIL_FAILED',
-        });
+        res.status(502).json(mail502Payload(mailErr));
         return;
       }
 
       res.json({ ok: true });
     } catch (e) {
-      console.error(e);
       if (!res.headersSent) {
-        res.status(500).json({ error: String(e?.message || e) });
+        sendServerError(res, e);
       }
     }
   });
@@ -474,8 +477,7 @@ export function mountAuthRoutes(app, prisma, hooks) {
 
       res.json({ ok: true });
     } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: String(e?.message || e) });
+      sendServerError(res, e);
     }
   });
 
@@ -520,18 +522,14 @@ export function mountAuthRoutes(app, prisma, hooks) {
         });
       } catch (mailErr) {
         console.error('[mail] resend', mailErr);
-        res.status(502).json({
-          error: String(mailErr?.message || mailErr),
-          code: 'MAIL_FAILED',
-        });
+        res.status(502).json(mail502Payload(mailErr));
         return;
       }
 
       res.json({ ok: true });
     } catch (e) {
-      console.error(e);
       if (!res.headersSent) {
-        res.status(500).json({ error: String(e?.message || e) });
+        sendServerError(res, e);
       }
     }
   });

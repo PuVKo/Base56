@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isProduction } from './httpError.js';
 
 /**
  * Роутер бесплатных моделей OpenRouter с фильтром по фичам запроса (в т.ч. tool calling).
@@ -305,6 +306,10 @@ async function executeTool(prisma, userId, writableKeys, redactedKeys, name, raw
       return { ok: true, booking: sanitizeBookingForLlm(rowToApi(row), redactedKeys) };
     } catch (e) {
       const code = e && typeof e === 'object' && 'code' in e ? e.code : '';
+      console.error('[assistant] create_booking', e);
+      if (isProduction) {
+        return { ok: false, error: 'create_failed', code: String(code) };
+      }
       return { ok: false, error: String(e?.message || e), code: String(code) };
     }
   }
@@ -372,8 +377,16 @@ function formatOpenRouterClientError(raw, httpStatus) {
       message: `На аккаунте OpenRouter нет кредитов (или ключ привязан к другому аккаунту). Пополните баланс: ${OPENROUTER_CREDITS_URL}`,
     };
   }
-  if (httpStatus === 429) return { status: 429, message: s };
-  return { status: 502, message: s };
+  if (httpStatus === 429) {
+    return {
+      status: 429,
+      message: isProduction ? 'Слишком много запросов к сервису модели. Подождите немного и повторите.' : s,
+    };
+  }
+  return {
+    status: 502,
+    message: isProduction ? 'Сервис модели временно недоступен. Попробуйте позже.' : s,
+  };
 }
 
 /**
@@ -492,7 +505,10 @@ export async function handleAssistantChat(prisma, req, res) {
       });
     } catch (err) {
       console.error('[assistant] fetch openrouter', err);
-      res.status(502).json({ error: `Сеть: не удалось связаться с OpenRouter (${String(err?.message || err)})` });
+      const msg = isProduction
+        ? 'Не удалось связаться с сервисом модели. Попробуйте позже.'
+        : `Сеть: не удалось связаться с OpenRouter (${String(err?.message || err)})`;
+      res.status(502).json({ error: msg });
       return;
     }
 
