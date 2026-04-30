@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { BookingDateInput } from '@/components/BookingDateInput';
 import { ClientFieldInputs } from '@/components/ClientFieldInputs';
@@ -134,19 +134,24 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
   /** Сериализованное состояние — стабильная зависимость для автосохранения (вложенные объекты, client и т.д.). */
   const draftJson = useMemo(() => (draft ? JSON.stringify(draft) : ''), [draft]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (open && booking) {
       const d = clone(booking);
       setDraft(d);
       baselineJson.current = JSON.stringify(d);
       setCommentDraftByKey({});
+    } else {
+      setDraft(null);
+      baselineJson.current = '';
+      setCommentDraftByKey({});
     }
-  }, [open, booking?.id]);
+  }, [open, booking]);
 
   useEffect(() => {
     if (!open || !draftJson) return;
     const d = draftRef.current;
     if (!d) return;
+    if (!booking || String(d.id) !== String(booking.id)) return;
     if (draftJson === baselineJson.current) return;
     try {
       void Promise.resolve(onSaveRef.current(d, { silent: true }));
@@ -154,14 +159,15 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
     } catch {
       /* toast в App */
     }
-  }, [draftJson, open]);
+  }, [draftJson, open, booking]);
 
   const handleDismiss = useCallback(async () => {
     if (onFlushSync) await onFlushSync();
     onClose();
   }, [onFlushSync, onClose]);
 
-  if (!open || !draft) return null;
+  if (!open || !booking) return null;
+  if (!draft || String(draft.id) !== String(booking.id)) return null;
 
   const visibleFields = [...(fields || [])]
     .filter((f) => f.visible)

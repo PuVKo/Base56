@@ -60,10 +60,18 @@ export function CalendarView({
     }));
   }
 
-  const filteredBookings = useMemo(
-    () => applyGalleryFilters(bookings, prefs, monthCursor, { calendarView: true }),
-    [bookings, prefs, monthCursor],
-  );
+  const filteredBookings = useMemo(() => {
+    // В сетке месяца показываем дни из соседних месяцев (padding),
+    // поэтому фильтр по периоду делаем по интервалу сетки, а не строго по monthCursor.
+    const base = applyGalleryFilters(bookings, prefs, monthCursor, { skipPeriod: true });
+    const start = format(startOfWeek(startOfMonth(monthCursor), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const end = format(endOfWeek(endOfMonth(monthCursor), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    return base.filter((b) => {
+      const d = typeof b.date === 'string' ? b.date : '';
+      if (!d) return false;
+      return d >= start && d <= end;
+    });
+  }, [bookings, prefs, monthCursor]);
 
   const hasFilters = isViewFiltersActive(prefs, { includePeriod: false });
 
@@ -104,10 +112,14 @@ export function CalendarView({
     [monthCursor, onMonthForDayChange],
   );
 
+  /**
+   * @param {string} iso
+   * @param {boolean} [syncMonthWithDay] — если false (дни padding соседнего месяца), не трогаем monthCursor
+   */
   const openDaySheet = useCallback(
-    (iso) => {
+    (iso, syncMonthWithDay = true) => {
       setDaySheetIso(iso);
-      syncMonthIfNeeded(iso);
+      if (syncMonthWithDay) syncMonthIfNeeded(iso);
     },
     [syncMonthIfNeeded],
   );
@@ -221,7 +233,7 @@ export function CalendarView({
         <div className="flex items-center justify-between px-0.5 shrink-0">
           <button
             type="button"
-            onClick={() => openDaySheet(iso)}
+            onClick={() => openDaySheet(iso, inMonth)}
             className={`text-left text-xs sm:text-sm font-semibold tabular-nums rounded px-0.5 -mx-0.5 touch-manipulation hover:bg-notion-hover/50 ${
               inMonth
                 ? isToday(day)
@@ -266,7 +278,7 @@ export function CalendarView({
       <button
         key={iso}
         type="button"
-        onClick={() => openDaySheet(iso)}
+        onClick={() => openDaySheet(iso, inMonth)}
         className={`flex min-h-[3.25rem] flex-col items-center justify-start gap-0.5 border-b border-notion-border/50 py-1.5 touch-manipulation transition-colors ${
           inMonth ? 'bg-notion-surface' : 'bg-notion-bg/95 opacity-[0.72] saturate-[0.65]'
         } active:bg-notion-hover/30`}

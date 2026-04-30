@@ -16,6 +16,40 @@ function cloneJson(x) {
 }
 
 /**
+ * Для стабильной сортировки внутри одного дня в календаре/галерее.
+ * @param {string} timeRange
+ */
+function timeStartKey(timeRange) {
+  const s = String(timeRange ?? '').trim();
+  if (!s) return '99:99';
+  const first = s.split(/[–-]/)[0]?.trim() ?? '';
+  const m = first.match(/^(\d{1,2})\s*:\s*(\d{2})$/);
+  if (!m) return '99:99';
+  const hh = String(Math.min(23, Math.max(0, Number(m[1])))).padStart(2, '0');
+  const mm = String(Math.min(59, Math.max(0, Number(m[2])))).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+/**
+ * Стабильная сортировка: дата → время → createdAt → id.
+ * Важно: клики/автосейв могут менять updatedAt — он НЕ должен влиять на порядок плиток.
+ * @param {ReturnType<typeof normalizeBooking>} a
+ * @param {ReturnType<typeof normalizeBooking>} b
+ */
+function compareBookingsStable(a, b) {
+  const da = String(a?.date ?? '');
+  const db = String(b?.date ?? '');
+  if (da !== db) return da.localeCompare(db);
+  const ta = timeStartKey(String(a?.timeRange ?? ''));
+  const tb = timeStartKey(String(b?.timeRange ?? ''));
+  if (ta !== tb) return ta.localeCompare(tb);
+  const ca = String(a?.createdAt ?? '');
+  const cb = String(b?.createdAt ?? '');
+  if (ca !== cb) return ca.localeCompare(cb);
+  return String(a?.id ?? '').localeCompare(String(b?.id ?? ''));
+}
+
+/**
  * @param {Record<string, unknown> | undefined} a
  * @param {Record<string, unknown>} b
  */
@@ -219,7 +253,7 @@ export function useBookingsAndFields() {
           bookingPayloadsRef.current.delete(bid);
           setBookings((prev) => {
             const other = prev.filter((b) => b.id !== n.id);
-            return [...other, n].sort((a, b) => a.date.localeCompare(b.date));
+            return [...other, n].sort(compareBookingsStable);
           });
         }
       }
@@ -315,7 +349,7 @@ export function useBookingsAndFields() {
         const other = prev.filter((b) => b.id !== id);
         const n = normalizeBooking(copy);
         if (!n) return prev;
-        return [...other, n].sort((a, b) => a.date.localeCompare(b.date));
+        return [...other, n].sort(compareBookingsStable);
       });
       markPending();
     },
