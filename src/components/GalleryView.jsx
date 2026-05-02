@@ -97,29 +97,33 @@ export function GalleryView({ bookings, monthCursor, fields, onOpenBooking, clie
       </FloatingSidePanel>
 
       {!sorted.length ? (
-        <div className="rounded-lg sm:rounded-xl border border-dashed border-notion-border px-4 py-10 sm:p-12 text-center text-sm text-notion-muted">
-          {bookings.length === 0
-            ? 'Пока нет записей. Создайте новую через кнопку выше.'
-            : hasFilters
-              ? 'Нет записей по выбранным фильтрам. Измените фильтры или сбросьте их.'
-              : 'Нет записей для отображения.'}
+        <div className="content">
+          <div className="card text-center text-sm muted py-12 border-dashed">
+            {bookings.length === 0
+              ? 'Пока нет записей. Создайте новую через кнопку выше.'
+              : hasFilters
+                ? 'Нет записей по выбранным фильтрам. Измените фильтры или сбросьте их.'
+                : 'Нет записей для отображения.'}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
-          {sorted.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => onOpenBooking(b.id)}
-              className="text-left h-full flex flex-col rounded-lg sm:rounded-xl border border-notion-border bg-notion-surface p-3 sm:p-4 active:bg-notion-hover/40 hover:border-notion-muted/50 hover:bg-notion-hover/30 transition-all shadow-sm touch-manipulation"
-            >
-              <GalleryTileBookingContent
-                booking={/** @type {Record<string, unknown>} */ (b)}
-                fields={fields}
-                galleryTileFieldVisible={tileVisible}
-              />
-            </button>
-          ))}
+        <div className="content">
+          <div className="tiles-grid">
+            {sorted.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => onOpenBooking(b.id)}
+                className="tile text-left h-full flex flex-col"
+              >
+                <GalleryTileBookingContent
+                  booking={/** @type {Record<string, unknown>} */ (b)}
+                  fields={fields}
+                  galleryTileFieldVisible={tileVisible}
+                />
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

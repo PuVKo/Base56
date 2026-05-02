@@ -56,70 +56,75 @@ export function AssistantView() {
   }, [input, loading, messages, scrollToBottom]);
 
   return (
-    <div className="max-w-3xl mx-auto flex flex-col h-full min-h-[320px] gap-4">
-      <p className="text-sm text-notion-muted">
-        Запросы идут на сервер с вашей сессией: модель может читать и менять записи через инструменты. Нужен{' '}
-        <span className="text-notion-muted/90 font-medium">OPENROUTER_API_KEY</span> в{' '}
-        <code className="text-xs bg-notion-surface px-1 rounded">server/.env</code>.
-      </p>
-      <p className="text-xs text-notion-muted/85">
-        Поле «Клиент» из записей в модель не передаётся. Текст сообщений в чате не фильтруется — не дублируйте там персональные данные без нужды.
-      </p>
-      <div className="flex-1 min-h-0 rounded-xl border border-notion-border bg-notion-surface/40 overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-3">
-        {messages.length === 0 ? (
-          <p className="text-sm text-notion-muted">Например: «Покажи записи на завтра» или «Создай запись на 2026-04-25, название Консультация».</p>
-        ) : null}
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[90%] rounded-lg px-3 py-2 break-words ${
-                m.role === 'user'
-                  ? 'bg-violet-600/90 text-white text-sm whitespace-pre-wrap'
-                  : 'bg-notion-hover/80 border border-notion-border/60'
-              }`}
-            >
-              {m.role === 'user' ? m.content : <AssistantMarkdown text={m.content} />}
-            </div>
-          </div>
-        ))}
-        {loading ? (
-          <div className="text-xs text-notion-muted">Думаю…</div>
-        ) : null}
-        <div ref={bottomRef} />
-      </div>
-      {error ? (
-        <div className="text-sm text-rose-300 bg-rose-950/20 border border-rose-500/25 rounded-lg px-3 py-2" role="alert">
-          {error}
+    <div className="content flex flex-col flex-1 min-h-0">
+      <div className="asst-shell flex-1 min-h-0 flex flex-col">
+        <div className="asst-intro shrink-0">
+          <h2>Ассистент</h2>
+          <p>
+            Запросы идут на сервер с вашей сессией: модель может читать и менять записи через инструменты. Нужен{' '}
+            <strong>OPENROUTER_API_KEY</strong> в <code className="text-xs opacity-90">server/.env</code>.
+          </p>
+          <p className="text-[12px] mt-2 mb-0">
+            Поле «Клиент» из записей в модель не передаётся. Не дублируйте персональные данные без нужды.
+          </p>
         </div>
-      ) : null}
-      <div className="flex gap-2 items-end">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          rows={2}
-          placeholder="Сообщение…"
-          className="flex-1 min-h-[2.75rem] max-h-40 rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-white placeholder:text-notion-muted focus:outline-none focus:ring-1 focus:ring-violet-500/50 resize-y"
-          disabled={loading}
-          aria-label="Сообщение ассистенту"
-        />
-        <button
-          type="button"
-          onClick={() => void send()}
-          disabled={loading || !input.trim()}
-          className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-white text-notion-bg text-sm font-medium hover:bg-white/90 disabled:opacity-40 disabled:pointer-events-none"
-        >
-          <Send className="w-4 h-4" aria-hidden />
-          Отправить
-        </button>
+
+        <div className="asst-stream flex-1 min-h-0">
+          {messages.length === 0 ? (
+            <p className="muted text-sm">
+              Например: «Покажи записи на завтра» или «Создай запись на 2026-04-25, название Консультация».
+            </p>
+          ) : null}
+          {messages.map((m, i) => (
+            <div key={i} className={`asst-msg ${m.role === 'user' ? 'you' : 'bot'}`}>
+              <div className="asst-avatar shrink-0">{m.role === 'user' ? 'Вы' : 'AI'}</div>
+              <div className="asst-bubble">
+                {m.role === 'user' ? (
+                  <span className="whitespace-pre-wrap">{m.content}</span>
+                ) : (
+                  <AssistantMarkdown text={m.content} />
+                )}
+              </div>
+            </div>
+          ))}
+          {loading ? <div className="muted text-xs">Думаю…</div> : null}
+          <div ref={bottomRef} />
+        </div>
+
+        {error ? (
+          <div className="text-sm px-3 py-2 rounded-[var(--radius-sm)] border border-rose-500/35 bg-rose-950/25 text-rose-200 shrink-0" role="alert">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="asst-composer shrink-0">
+          <div className="asst-input-row">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              rows={2}
+              placeholder="Сообщение…"
+              className="asst-input"
+              disabled={loading}
+              aria-label="Сообщение ассистенту"
+            />
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={loading || !input.trim()}
+              className="btn btn-primary shrink-0 self-end"
+            >
+              <Send className="w-4 h-4" aria-hidden />
+              Отправить
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -14,16 +14,16 @@ function clone(b) {
 }
 
 const inputCls =
-  'w-full rounded-md border-0 border-b border-transparent bg-transparent px-0 py-1 text-sm text-white placeholder:text-notion-muted/50 focus:outline-none focus:border-violet-500/50 focus:ring-0';
+  'w-full rounded-md border-0 border-b border-transparent bg-transparent px-0 py-1 text-sm text-notion-fg placeholder:text-notion-muted/50 focus:outline-none focus:border-brand/60 focus:ring-0';
 
 const inputBordered =
-  'w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-white placeholder:text-notion-muted focus:outline-none focus:ring-2 focus:ring-violet-500/40';
+  'w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-notion-fg placeholder:text-notion-muted focus:outline-none focus:ring-2 focus:ring-brand/45';
 
 const moneyInputShell =
-  'w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm flex items-center gap-2 focus-within:outline-none focus-within:ring-2 focus-within:ring-violet-500/40';
+  'w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm flex items-center gap-2 focus-within:outline-none focus-within:ring-2 focus-within:ring-brand/45';
 
 const moneyInputInner =
-  'flex-1 min-w-0 min-h-[1.25rem] bg-transparent border-0 p-0 text-white tabular-nums placeholder:text-notion-muted focus:outline-none focus:ring-0';
+  'flex-1 min-w-0 min-h-[1.25rem] bg-transparent border-0 p-0 text-notion-fg tabular-nums placeholder:text-notion-muted focus:outline-none focus:ring-0';
 
 /** @param {string} s */
 function parseMoneyDigits(s) {
@@ -100,7 +100,7 @@ function MoneyIntInput({ value, onChange }) {
  */
 function PropertyRow({ Icon, label, children }) {
   return (
-    <div className="flex items-start gap-2 py-2 px-1 -mx-1 rounded-md hover:bg-white/[0.04] transition-colors">
+    <div className="flex items-start gap-2 py-2 px-1 -mx-1 rounded-md hover:bg-notion-hover transition-colors">
       <Icon className="w-4 h-4 shrink-0 mt-1 text-notion-muted/75" strokeWidth={1.75} aria-hidden />
       <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 flex-1 min-w-0">
         <span className="text-sm text-notion-muted shrink-0 sm:w-36 sm:pt-1">{label}</span>
@@ -315,7 +315,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
               type="checkbox"
               checked={Boolean(draft[key])}
               onChange={(e) => patch(key, e.target.checked)}
-              className="rounded border-notion-border bg-notion-bg text-violet-600 focus:ring-violet-500/40"
+              className="rounded border-notion-border bg-notion-bg text-brand focus:ring-brand/45"
             />
             <span className="text-sm text-notion-muted">Да</span>
           </label>
@@ -332,7 +332,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
                 onClick={() => patch(key, cur === opt.id ? '' : opt.id)}
                 className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
                   cur === opt.id
-                    ? `${notionPillClasses(opt.color)} ring-1 ring-white/25`
+                    ? `${notionPillClasses(opt.color)} ring-2 ring-black/15 dark:ring-white/25`
                     : 'border-notion-border text-notion-muted hover:bg-notion-hover'
                 }`}
               >
@@ -355,7 +355,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
                 onClick={() => toggleMulti(key, opt.id)}
                 className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
                   selected.has(opt.id)
-                    ? `${notionPillClasses(opt.color)} ring-1 ring-white/25`
+                    ? `${notionPillClasses(opt.color)} ring-2 ring-black/15 dark:ring-white/25`
                     : 'border-notion-border text-notion-muted hover:bg-notion-hover'
                 }`}
               >
@@ -377,7 +377,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
                 onClick={() => patch(f.key, cur === opt.id ? '' : opt.id)}
                 className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
                   cur === opt.id
-                    ? `${notionPillClasses(opt.color)} ring-1 ring-white/25`
+                    ? `${notionPillClasses(opt.color)} ring-2 ring-black/15 dark:ring-white/25`
                     : 'border-notion-border text-notion-muted hover:bg-notion-hover'
                 }`}
               >
@@ -401,7 +401,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
                 onClick={() => toggleMulti(f.key, opt.id)}
                 className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
                   tagIds.includes(opt.id)
-                    ? `${notionPillClasses(opt.color)} ring-1 ring-white/25`
+                    ? `${notionPillClasses(opt.color)} ring-2 ring-black/15 dark:ring-white/25`
                     : 'border-notion-border text-notion-muted hover:bg-notion-hover'
                 }`}
               >
@@ -423,7 +423,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
                 onClick={() => patch(f.key, cur === opt.id ? '' : opt.id)}
                 className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
                   cur === opt.id
-                    ? `${notionPillClasses(opt.color)} ring-1 ring-white/25`
+                    ? `${notionPillClasses(opt.color)} ring-2 ring-black/15 dark:ring-white/25`
                     : 'border-notion-border text-notion-muted hover:bg-notion-hover'
                 }`}
               >
@@ -441,7 +441,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
               {list.map((c) => (
                 <li
                   key={c.id}
-                  className="flex gap-2 items-start text-sm text-white/90 bg-notion-bg rounded-lg px-3 py-2 border border-notion-border/60"
+                  className="flex gap-2 items-start text-sm text-notion-fg/90 bg-notion-bg rounded-lg px-3 py-2 border border-notion-border/60"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="whitespace-pre-wrap break-words">{c.text}</div>
@@ -482,7 +482,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
               <button
                 type="button"
                 onClick={() => addComment(f.key)}
-                className="px-3 py-2 rounded-lg border border-notion-border text-sm text-notion-muted hover:bg-notion-hover hover:text-white transition-colors shrink-0"
+                className="px-3 py-2 rounded-lg border border-notion-border text-sm text-notion-muted hover:bg-notion-hover hover:text-notion-fg transition-colors shrink-0"
               >
                 Добавить
               </button>
@@ -526,7 +526,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
           <button
             type="button"
             onClick={() => void handleDismiss()}
-            className="p-2 rounded-md text-notion-muted hover:bg-notion-hover hover:text-white shrink-0 touch-manipulation"
+            className="p-2 rounded-md text-notion-muted hover:bg-notion-hover hover:text-notion-fg shrink-0 touch-manipulation"
             aria-label="Закрыть"
           >
             <X className="w-5 h-5" />
@@ -540,7 +540,7 @@ export function BookingModal({ open, booking, onSave, onFlushSync, onClose, onDe
                 type="text"
                 value={typeof draft.title === 'string' ? draft.title : ''}
                 onChange={(e) => patch('title', e.target.value)}
-                className="w-full text-xl sm:text-2xl font-semibold bg-transparent border-0 outline-none focus:ring-0 text-white placeholder:text-notion-muted/45 px-0"
+                className="w-full text-xl sm:text-2xl font-semibold bg-transparent border-0 outline-none focus:ring-0 text-notion-fg placeholder:text-notion-muted/45 px-0"
                 placeholder="Название"
               />
             </div>

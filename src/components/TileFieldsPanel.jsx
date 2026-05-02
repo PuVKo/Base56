@@ -17,12 +17,12 @@ export function TileFieldsPanel({ fields, tileVisible, title, description, onTog
 
   return (
     <div className={shell}>
-      <p className="text-sm font-medium text-white">{title}</p>
+      <p className="text-sm font-medium text-notion-fg">{title}</p>
       <p className="text-xs text-notion-muted mt-1 leading-relaxed">{description}</p>
       <ul className="mt-3 space-y-2 max-h-[min(60vh,28rem)] overflow-y-auto pr-1">
         {fieldsSorted.map((f) => (
           <li key={f.id}>
-            <label className="flex items-start gap-2 cursor-pointer text-sm text-notion-muted hover:text-white">
+            <label className="flex items-start gap-2 cursor-pointer text-sm text-notion-muted hover:text-notion-fg">
               <input
                 type="checkbox"
                 className="rounded border-notion-border mt-0.5 shrink-0"
@@ -32,7 +32,7 @@ export function TileFieldsPanel({ fields, tileVisible, title, description, onTog
                 }}
               />
               <span>
-                <span className="text-white/90">{f.label}</span>
+                <span className="text-notion-fg/90">{f.label}</span>
                 <span className="block text-[11px] text-notion-muted/80 mt-0.5">{f.key}</span>
               </span>
             </label>

@@ -8,7 +8,7 @@ import {
 import { normalizeClientFieldValue } from '@/lib/clientField';
 
 const subInput =
-  'w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-white placeholder:text-notion-muted focus:outline-none focus:ring-2 focus:ring-violet-500/40';
+  'w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-notion-fg placeholder:text-notion-muted focus:outline-none focus:ring-2 focus:ring-brand/45';
 
 /**
  * @param {object} p

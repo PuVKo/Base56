@@ -2,13 +2,12 @@ import { useMemo } from 'react';
 import { FloatingSidePanel } from '@/components/FloatingSidePanel';
 import { TileFieldsPanel } from '@/components/TileFieldsPanel';
 import { ViewFiltersPanel } from '@/components/ViewFiltersPanel';
-import { tagById } from '@/data/constants';
 import { normalizeClientFieldValue } from '@/lib/clientField';
 import { formatRu7Progressive } from '@/lib/ruPhoneMask';
 import { applyGalleryFilters, isGalleryPrefsActive } from '@/lib/galleryFilterPrefs';
 import { defaultGalleryFilters } from '@/lib/galleryPrefsModel';
+import { BookingSourceChip, BookingStatusChip, BookingTagChips } from '@/components/MockupChips.jsx';
 import { formatDateDdMmYyyy, formatRub } from '@/lib/format';
-import { pillDisplayForField, tagPillFromFieldOrConstants } from '@/lib/fieldOptions';
 import { TABLE_SLOT_ORDER, fieldForTableSlot, isTableSlotVisible } from '@/lib/tableViewSlots';
 
 const SLOT_LABELS = {
@@ -48,8 +47,6 @@ function bookingClientRaw(b, clientField) {
 export function TableView({ bookings, monthCursor, fields, onOpenBooking, clientUi, updateClientUi }) {
   const prefs = clientUi.tableFilters;
   const tileVisible = clientUi.tableTileFieldVisible || {};
-  const tagsField = fields?.find((f) => f.type === 'tags' || f.key === 'tagIds');
-
   /** @param {import('@/lib/galleryPrefsModel').GalleryFilterPrefs | ((p: import('@/lib/galleryPrefsModel').GalleryFilterPrefs) => import('@/lib/galleryPrefsModel').GalleryFilterPrefs)} nextOrFn */
   function setTableFilters(nextOrFn) {
     updateClientUi((prev) => ({
@@ -129,11 +126,12 @@ export function TableView({ bookings, monthCursor, fields, onOpenBooking, client
         />
       </FloatingSidePanel>
 
-      <div className="rounded-lg sm:rounded-xl border border-notion-border bg-notion-surface overflow-hidden">
+      <div className="content">
+      <div className="tbl-wrap">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs sm:text-sm min-w-[640px]">
+          <table className="tbl min-w-[640px]">
             <thead>
-              <tr className="border-b border-notion-border text-left text-notion-muted text-[10px] sm:text-xs uppercase tracking-wide">
+              <tr>
                 {visibleSlots.map((slot) => (
                   <th
                     key={slot}
@@ -167,115 +165,69 @@ export function TableView({ bookings, monthCursor, fields, onOpenBooking, client
                 </tr>
               ) : (
                 sorted.map((b) => {
-                  const status = pillDisplayForField(fields, 'status', b.status);
-                  const src = pillDisplayForField(fields, 'sourceId', b.sourceId);
                   return (
                     <tr
                       key={b.id}
-                      className="border-b border-notion-border/60 hover:bg-notion-hover/40 cursor-pointer transition-colors"
+                      className="cursor-pointer"
                       onClick={() => onOpenBooking(b.id)}
                     >
                       {visibleSlots.map((slot) => {
                         if (slot === 'date') {
                           return (
-                            <td
-                              key={slot}
-                              className="px-2 sm:px-4 py-2 sm:py-2.5 text-notion-muted whitespace-nowrap tabular-nums"
-                            >
+                            <td key={slot} className="tbl-date whitespace-nowrap">
                               {formatDateDdMmYyyy(b.date)}
                             </td>
                           );
                         }
                         if (slot === 'title') {
                           return (
-                            <td
-                              key={slot}
-                              className="px-2 sm:px-4 py-2 sm:py-2.5 text-white font-medium max-w-[12rem] sm:max-w-none truncate sm:whitespace-normal"
-                            >
+                            <td key={slot} className="tbl-title max-w-[12rem] sm:max-w-none truncate sm:whitespace-normal">
                               {b.title || '—'}
                             </td>
                           );
                         }
                         if (slot === 'time') {
                           return (
-                            <td key={slot} className="px-2 sm:px-4 py-2 sm:py-2.5 text-notion-muted whitespace-nowrap">
+                            <td key={slot} className="tbl-time whitespace-nowrap">
                               {b.timeRange || '—'}
                             </td>
                           );
                         }
                         if (slot === 'description') {
                           return (
-                            <td
-                              key={slot}
-                              className="px-2 sm:px-4 py-2 sm:py-2.5 text-notion-muted max-w-[10rem] sm:max-w-xs truncate"
-                            >
+                            <td key={slot} className="tbl-desc max-w-[10rem] sm:max-w-xs">
                               {b.description || '—'}
                             </td>
                           );
                         }
                         if (slot === 'amount') {
                           return (
-                            <td
-                              key={slot}
-                              className="px-2 sm:px-4 py-2 sm:py-2.5 text-right text-emerald-200/90 font-medium tabular-nums whitespace-nowrap"
-                            >
+                            <td key={slot} className="tbl-amount text-right whitespace-nowrap">
                               {formatRub(b.amount)}
                             </td>
                           );
                         }
                         if (slot === 'status') {
                           return (
-                            <td key={slot} className="px-2 sm:px-4 py-2 sm:py-2.5">
-                              <span
-                                className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-md inline-block whitespace-nowrap ${status.className}`}
-                              >
-                                {status.label}
-                              </span>
+                            <td key={slot}>
+                              <BookingStatusChip fields={fields} status={b.status} />
                             </td>
                           );
                         }
                         if (slot === 'tags') {
                           return (
-                            <td key={slot} className="px-2 sm:px-4 py-2 sm:py-2.5">
+                            <td key={slot}>
                               <div className="flex flex-wrap gap-1">
-                                {b.tagIds.map((tid) => {
-                                  const pill = tagPillFromFieldOrConstants(tagsField, tid);
-                                  if (pill) {
-                                    return (
-                                      <span
-                                        key={tid}
-                                        className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-md ${pill.className}`}
-                                      >
-                                        {pill.label}
-                                      </span>
-                                    );
-                                  }
-                                  const tg = tagById(tid);
-                                  if (!tg) return null;
-                                  return (
-                                    <span
-                                      key={tid}
-                                      className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-md ${tg.className}`}
-                                    >
-                                      {tg.label}
-                                    </span>
-                                  );
-                                })}
-                                {!b.tagIds.length ? '—' : null}
+                                <BookingTagChips fields={fields} tagIds={b.tagIds || []} />
+                                {!b.tagIds?.length ? '—' : null}
                               </div>
                             </td>
                           );
                         }
                         if (slot === 'source') {
                           return (
-                            <td key={slot} className="px-2 sm:px-4 py-2 sm:py-2.5">
-                              {src.label ? (
-                                <span
-                                  className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-md inline-block ${src.className}`}
-                                >
-                                  {src.label}
-                                </span>
-                              ) : null}
+                            <td key={slot}>
+                              <BookingSourceChip fields={fields} sourceId={b.sourceId} />
                             </td>
                           );
                         }
@@ -295,7 +247,7 @@ export function TableView({ bookings, monthCursor, fields, onOpenBooking, client
                               ) : (
                                 <div className="flex flex-col gap-0.5 min-w-0">
                                   {name.trim() ? (
-                                    <span className="text-white/90 font-medium leading-snug break-words">{name.trim()}</span>
+                                    <span className="text-notion-fg/90 font-medium leading-snug break-words">{name.trim()}</span>
                                   ) : null}
                                   {phoneLine ? (
                                     <span className="text-notion-muted text-[11px] sm:text-xs tabular-nums leading-snug">
@@ -316,11 +268,11 @@ export function TableView({ bookings, monthCursor, fields, onOpenBooking, client
             </tbody>
             {sorted.length > 0 && colCount > 0 ? (
               <tfoot>
-                <tr className="bg-notion-bg/90 border-t border-notion-border">
-                  <td colSpan={colCount} className="px-2 sm:px-4 py-2 sm:py-3">
+                <tr className="tbl-foot">
+                  <td colSpan={colCount}>
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-xs">
                       <span className="text-notion-muted font-medium">Итого ({sorted.length})</span>
-                      <span className="text-emerald-200 font-semibold tabular-nums">{formatRub(sum)}</span>
+                      <span className="text-brand font-semibold tabular-nums">{formatRub(sum)}</span>
                     </div>
                   </td>
                 </tr>
@@ -328,6 +280,7 @@ export function TableView({ bookings, monthCursor, fields, onOpenBooking, client
             ) : null}
           </table>
         </div>
+      </div>
       </div>
     </div>
   );

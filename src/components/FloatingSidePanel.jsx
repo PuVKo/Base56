@@ -63,13 +63,13 @@ export function FloatingSidePanel({ open, onClose, title, header, panelClassName
           <div className="shrink-0 border-b border-notion-border">{header}</div>
         ) : (
           <div className="flex items-center justify-between gap-3 border-b border-notion-border px-4 py-3 shrink-0">
-            <h2 id="floating-side-panel-title" className="text-base font-semibold text-white truncate">
+            <h2 id="floating-side-panel-title" className="text-base font-semibold text-notion-fg truncate">
               {title}
             </h2>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-lg border border-notion-border p-2 text-notion-muted hover:bg-notion-hover hover:text-white transition-colors shrink-0"
+              className="inline-flex items-center justify-center rounded-lg border border-notion-border p-2 text-notion-muted hover:bg-notion-hover hover:text-notion-fg transition-colors shrink-0"
               aria-label="Закрыть"
             >
               <X className="w-4 h-4" />

@@ -11,15 +11,8 @@ import {
   upcomingBookingsInCalendarYear,
 } from '@/lib/dashboardStats';
 import { filterByCalendarYear, filterByMonth } from '@/lib/bookingUtils';
+import { BookingSourceChip, BookingStatusChip } from '@/components/MockupChips.jsx';
 import { formatDateRu, formatOrderCountRu, formatRub } from '@/lib/format';
-
-/** Подпись деления оси Y (руб.) */
-function axisRubLabel(n) {
-  if (!Number.isFinite(n) || n <= 0) return '0';
-  if (n >= 1_000_000) return `${Math.round(n / 100_000) / 10} млн`;
-  if (n >= 1000) return `${Math.round(n / 1000)} тыс`;
-  return String(Math.round(n));
-}
 
 /** Короткая сумма над столбцом */
 function barTopLabel(sum) {
@@ -27,9 +20,6 @@ function barTopLabel(sum) {
   if (sum >= 1000) return `${Math.round(sum / 1000)}k`;
   return formatRub(sum);
 }
-
-/** Высота поля гистограммы (px) — общая для оси Y и области столбцов */
-const PLOT_H = 200;
 
 /**
  * Сектор кольца (donut).
@@ -128,9 +118,6 @@ function SourceRevenueDonut({ sources, segments, totalSum }) {
           .join('. ')}`
       : 'Доля выручки по источникам — нет данных';
 
-  /** Совпадает с внутренним радиусом r1 в viewBox 0…100: иначе хаб перекрывает кольцо */
-  const hubInsetPct = `${(50 - r1).toFixed(2)}%`;
-
   const setTipFromEvent = (e, sl) => {
     const root = chartWrapRef.current;
     if (!root) return;
@@ -155,9 +142,9 @@ function SourceRevenueDonut({ sources, segments, totalSum }) {
     <div className="flex w-full flex-col items-stretch gap-4" role="img" aria-label={ariaLabel}>
       <div
         ref={chartWrapRef}
-        className="relative mx-auto aspect-square w-full max-w-[min(100%,15rem)] sm:max-w-[min(100%,16.5rem)]"
+        className="donut-wrap relative mx-auto aspect-square w-full max-w-[min(100%,15rem)] sm:max-w-[min(100%,16.5rem)] max-h-[220px]"
       >
-        <div className="relative size-full">
+        <div className="relative size-full min-h-0">
           <svg viewBox="0 0 100 100" className="size-full" aria-hidden>
             <title>Выручка по источникам</title>
             {n === 0 || (!singleFull && !hasSlice) ? (
@@ -223,7 +210,7 @@ function SourceRevenueDonut({ sources, segments, totalSum }) {
                         key={sl.id}
                         d={sl.d}
                         fill={sl.fill}
-                        stroke="#191919"
+                        stroke="rgb(var(--notion-bg))"
                         strokeOpacity={0.92}
                         strokeWidth={1.05}
                         strokeLinejoin="round"
@@ -245,20 +232,15 @@ function SourceRevenueDonut({ sources, segments, totalSum }) {
           </svg>
 
           {n > 0 && (singleFull || hasSlice) && bestSeg ? (
-            <div
-              className="pointer-events-none absolute z-[1] flex flex-col items-center justify-center rounded-full bg-notion-surface px-2 text-center ring-1 ring-notion-border/70"
-              style={{ inset: hubInsetPct }}
-            >
-              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-notion-muted">лучший</span>
-              <span className="mt-1 line-clamp-2 max-w-[96%] text-center text-sm font-semibold leading-snug text-white sm:text-base">
+            <div className="donut-center pointer-events-none z-[1]">
+              <div className="donut-eyebrow">Лучший</div>
+              <div className="donut-name line-clamp-2 max-w-[96%] mx-auto">
                 {singleFull ? sources.find((s) => s.id === segments[0].id)?.label ?? segments[0].id : bestLabel}
-              </span>
-              <span className="mt-1 text-lg font-bold tabular-nums text-white sm:text-xl">
-                {singleFull ? '100%' : `${bestSeg.pct.toFixed(1)}%`}
-              </span>
-              <span className="mt-1 max-w-[96%] truncate text-xs tabular-nums text-notion-muted sm:text-sm">
+              </div>
+              <div className="donut-share">{singleFull ? '100%' : `${bestSeg.pct.toFixed(1)}%`}</div>
+              <div className="donut-amount tabular-nums">
                 {formatRub(singleFull ? segments[0].sum : bestSeg.sum)}
-              </span>
+              </div>
             </div>
           ) : null}
 
@@ -271,11 +253,11 @@ function SourceRevenueDonut({ sources, segments, totalSum }) {
                 transform: 'translate(-50%, calc(-100% - 12px))',
               }}
             >
-              <p className="line-clamp-3 text-sm font-semibold leading-tight text-white break-words">
+              <p className="line-clamp-3 text-sm font-semibold leading-tight text-notion-fg break-words">
                 {sliceTip.label}
               </p>
               <p className="mt-1 text-xs leading-tight tabular-nums text-notion-muted">
-                <span className="font-semibold text-white">{sliceTip.pct.toFixed(1)}%</span>
+                <span className="font-semibold text-notion-fg">{sliceTip.pct.toFixed(1)}%</span>
                 <span className="text-notion-muted/55"> · </span>
                 {formatRub(sliceTip.sum)}
                 <span className="text-notion-muted/55"> · </span>
@@ -286,33 +268,20 @@ function SourceRevenueDonut({ sources, segments, totalSum }) {
         </div>
       </div>
 
-      <ul className="grid min-w-0 w-full grid-cols-3 gap-1.5 sm:gap-2">
+      <ul className="src-legend min-w-0 w-full">
         {segments.map((seg) => {
           const src = sources.find((s) => s.id === seg.id);
           const fill = src?.fillHex ?? notionColorFillHex('gray');
           return (
-            <li
-              key={seg.id}
-              className="flex min-h-0 min-w-0 items-center gap-1.5 rounded-lg border border-notion-border/50 bg-notion-bg/30 px-1.5 py-1.5 sm:gap-2 sm:px-2"
-            >
-              <span
-                className="size-2 shrink-0 rounded-full ring-1 ring-white/12"
-                style={{ backgroundColor: fill }}
-                aria-hidden
-              />
-              <div className="min-w-0 flex-1 leading-tight">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[11px] font-medium text-white/95 sm:text-xs">{src?.label ?? seg.id}</span>
-                  <span className="shrink-0 text-[10px] font-semibold tabular-nums text-notion-muted sm:text-[11px]">
-                    {seg.pct.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="mt-0.5 truncate text-[10px] tabular-nums text-notion-muted/90">
-                  {formatRub(seg.sum)}
-                  <span className="text-notion-muted/40"> · </span>
-                  {formatOrderCountRu(seg.count)}
+            <li key={seg.id} className="src-legend-item">
+              <span className="dot shrink-0" style={{ backgroundColor: fill }} aria-hidden />
+              <div className="src-legend-info min-w-0">
+                <div className="src-legend-name">{src?.label ?? seg.id}</div>
+                <div className="src-legend-meta tabular-nums">
+                  {formatRub(seg.sum)} · {formatOrderCountRu(seg.count)}
                 </div>
               </div>
+              <span className="src-legend-share tabular-nums">{seg.pct.toFixed(1)}%</span>
             </li>
           );
         })}
@@ -321,16 +290,12 @@ function SourceRevenueDonut({ sources, segments, totalSum }) {
   );
 }
 
-function KpiCard({ title, value, hint, accent }) {
+function KpiCard({ title, value, hint, primaryAccent }) {
   return (
-    <div
-      className={`relative overflow-hidden rounded-2xl border border-notion-border bg-notion-surface p-4 sm:p-5 shadow-sm ${accent}`}
-    >
-      <div className="text-xs font-medium uppercase tracking-wide text-notion-muted">{title}</div>
-      <div className="mt-2 text-2xl sm:text-3xl font-semibold text-white tabular-nums tracking-tight">
-        {value}
-      </div>
-      {hint ? <div className="mt-1.5 text-xs text-notion-muted">{hint}</div> : null}
+    <div className="kpi-card card">
+      <div className="kpi-eyebrow">{title}</div>
+      <div className={`kpi-value ${primaryAccent ? 'accent' : ''}`}>{value}</div>
+      {hint ? <div className="kpi-sub">{hint}</div> : null}
     </div>
   );
 }
@@ -512,26 +477,21 @@ export function DashboardView({ bookings, monthCursor, fields, onOpenBooking, da
         : 'Сводка за всё время';
   const heroBlurb =
     dashboardPeriod === 'month'
-      ? 'Выручка, записи и источники за выбранный месяц. Период и месяц меняются в панели «Период» в шапке.'
+      ? 'Выручка, записи и источники за выбранный месяц. Период и месяц меняются в шапке дашборда.'
       : dashboardPeriod === 'year'
         ? 'Показаны все записи с датой в выбранном календарном году. Переключите год в той же панели.'
         : 'Показаны все записи с датой съёмки. График ниже — по месяцам текущего календарного года.';
 
   return (
-    <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto">
-      <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-950/40 via-notion-surface to-notion-bg p-5 sm:p-8">
-        <p className="text-xs font-medium uppercase tracking-widest text-violet-300/80">Отчёты</p>
-        <h1
-          className={`mt-1 text-2xl sm:text-3xl font-semibold text-white ${
-            dashboardPeriod === 'month' ? 'capitalize' : ''
-          }`}
-        >
-          {heroTitle}
-        </h1>
-        <p className="mt-2 text-sm text-notion-muted max-w-xl">{heroBlurb}</p>
+    <div className="content">
+      <div className="content-narrow">
+      <div className="dash-hero card card-pad-lg">
+        <div className="card-eyebrow">Отчёты</div>
+        <h1 className={`dash-hero-title ${dashboardPeriod === 'month' ? 'capitalize' : ''}`}>{heroTitle}</h1>
+        <p className="dash-hero-sub">{heroBlurb}</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+      <div className="kpi-grid">
         <KpiCard
           title={stats.primaryKpiTitle}
           value={formatRub(stats.reportSum)}
@@ -540,7 +500,7 @@ export function DashboardView({ bookings, monthCursor, fields, onOpenBooking, da
               stats.prevSum > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   {stats.delta >= 0 ? (
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                    <TrendingUp className="w-3.5 h-3.5" style={{ color: 'var(--status-done)' }} />
                   ) : (
                     <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
                   )}
@@ -552,44 +512,30 @@ export function DashboardView({ bookings, monthCursor, fields, onOpenBooking, da
               )
             ) : null
           }
-          accent="ring-1 ring-emerald-500/10"
+          primaryAccent
         />
         <KpiCard
           title="Всего записей"
           value={String(stats.reportList.length)}
           hint={`Средний чек ${formatRub(Math.round(stats.avgCheck))}`}
-          accent="ring-1 ring-sky-500/10"
         />
         <KpiCard
           title="Предстоящие записи"
           value={String(stats.upcoming.length)}
           hint="До конца года · Записан и Переговоры"
-          accent="ring-1 ring-amber-500/10"
         />
-        <KpiCard
-          title={stats.kpi4Title}
-          value={stats.kpi4Value}
-          hint={stats.kpi4Hint}
-          accent="ring-1 ring-violet-500/10"
-        />
+        <KpiCard title={stats.kpi4Title} value={stats.kpi4Value} hint={stats.kpi4Hint} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <div className="rounded-2xl border border-notion-border bg-notion-surface p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
+      <div className="dash-two-col">
+        <div className="card">
+          <div className="card-h">
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-white">Проекты в обработке</h2>
-              <p className="text-xs text-notion-muted mt-0.5 leading-relaxed">
-                Только записи со статусом «Обрабатывается» за выбранный период
-              </p>
+              <h2 className="card-title">Проекты в обработке</h2>
+              <p className="card-sub">Только записи со статусом «Обрабатывается» за выбранный период</p>
             </div>
-            <div
-              className="shrink-0 flex items-center justify-center rounded-lg border border-notion-border/70 bg-notion-bg/40 px-2.5 py-1.5 min-w-[2.75rem]"
-              title="Заказов в статусе «Обрабатывается» в выбранном периоде"
-            >
-              <span className="text-lg font-semibold tabular-nums text-white/90 leading-none">
-                {stats.processingInPeriod.length}
-              </span>
+            <div className="badge-count" title="Заказов в статусе «Обрабатывается» в выбранном периоде">
+              {stats.processingInPeriod.length}
             </div>
           </div>
           {stats.reportList.length === 0 ? (
@@ -601,44 +547,38 @@ export function DashboardView({ bookings, monthCursor, fields, onOpenBooking, da
               Нет записей в статусе «Обрабатывается» за этот период
             </p>
           ) : (
-            <ul className="space-y-2 max-h-[min(320px,50vh)] overflow-y-auto pr-0.5">
-              {stats.processingInPeriod.map((b) => {
-                const st = pillDisplayForField(fields, 'status', b.status);
-                return (
-                  <li key={b.id}>
-                    <button
-                      type="button"
-                      onClick={() => onOpenBooking(b.id)}
-                      className="w-full text-left rounded-xl border border-notion-border/70 bg-notion-bg/50 px-3 py-2.5 hover:bg-notion-hover/45 transition-colors touch-manipulation"
-                    >
-                      <div className="font-medium text-white text-sm leading-snug line-clamp-2">
-                        {b.title || 'Без названия'}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-[11px] sm:text-xs">
-                        <span className="text-notion-muted tabular-nums">{formatDateRu(b.date)}</span>
+            <ul className="proj-list max-h-[min(320px,50vh)] overflow-y-auto pr-0.5">
+              {stats.processingInPeriod.map((b) => (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenBooking(b.id)}
+                    className="proj-row w-full text-left font-inherit"
+                  >
+                    <div className="proj-row-main">
+                      <div className="proj-title">{b.title || 'Без названия'}</div>
+                      <div className="proj-meta">
+                        <span className="proj-date tabular-nums">{formatDateRu(b.date)}</span>
                         {b.timeRange ? (
-                          <span className="text-sky-200/85 tabular-nums font-medium">{b.timeRange}</span>
+                          <>
+                            <span className="proj-dot">·</span>
+                            <span className="tabular-nums">{b.timeRange}</span>
+                          </>
                         ) : null}
-                        <span
-                          className={`px-1.5 py-0.5 rounded-md leading-none ${st.className}`}
-                        >
-                          {st.label}
-                        </span>
-                        {b.amount ? (
-                          <span className="text-emerald-200/90 tabular-nums ml-auto">{formatRub(b.amount)}</span>
-                        ) : null}
+                        <BookingStatusChip fields={fields} status={b.status} />
                       </div>
-                    </button>
-                  </li>
-                );
-              })}
+                    </div>
+                    {b.amount ? <div className="proj-amount tabular-nums">{formatRub(b.amount)}</div> : null}
+                  </button>
+                </li>
+              ))}
             </ul>
           )}
         </div>
 
-        <div className="rounded-2xl border border-notion-border bg-notion-surface p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-white">Источники</h2>
-          <p className="text-xs text-notion-muted mt-0.5 mb-4 leading-relaxed">
+        <div className="card">
+          <h2 className="card-title">Источники</h2>
+          <p className="card-sub mb-4">
             Доля выручки за период: в центре — лидер по сумме; наведите на сектор кольца, чтобы увидеть партнёра и долю.
             Ниже — компактный список источников.
           </p>
@@ -660,119 +600,65 @@ export function DashboardView({ bookings, monthCursor, fields, onOpenBooking, da
         </div>
       </div>
 
-      <div className="rounded-2xl border border-violet-500/15 bg-gradient-to-br from-notion-surface via-notion-surface to-violet-950/25 shadow-sm overflow-hidden">
-        <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b border-notion-border/60">
+      <div className="card dyn-card overflow-hidden">
+        <div className="card-h pb-4 border-b border-[color:var(--border)]">
           <div>
-            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-widest text-violet-300/75">
-              Динамика
-            </p>
-            <h2 className="mt-1 text-base sm:text-lg font-semibold text-white tracking-tight">
-              Выручка по месяцам
-            </h2>
-            <p className="text-xs text-notion-muted mt-1 max-w-md">
+            <div className="card-eyebrow mb-1">Динамика</div>
+            <h2 className="card-title big mb-1">Выручка по месяцам</h2>
+            <p className="card-sub">
               Календарный год {stats.chartYear}: с января по декабрь
             </p>
           </div>
-          <div className="flex items-baseline justify-between sm:block sm:text-right gap-4 rounded-xl bg-notion-bg/50 border border-notion-border/80 px-4 py-3 sm:py-2 sm:px-0 sm:border-0 sm:bg-transparent">
-            <div className="text-[10px] uppercase tracking-wide text-notion-muted sm:mb-0.5">За период</div>
-            <div className="text-xl sm:text-2xl font-semibold tabular-nums text-white">
-              {formatRub(stats.yearTotal)}
-            </div>
+          <div className="dyn-total text-right">
+            <div className="kpi-eyebrow mb-1">За период</div>
+            <div className="kpi-value">{formatRub(stats.yearTotal)}</div>
           </div>
         </div>
 
         <div className="p-4 sm:p-6 pt-4">
-          <div className="rounded-lg border border-notion-border/70 bg-notion-bg/40 p-3 sm:p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
-              <span className="text-[11px] text-notion-muted">
-                Столбец — месяц; сверху сумма (₽), внизу число записей
-              </span>
-              <span className="shrink-0 text-[11px] tabular-nums text-notion-muted">
-                максимум {formatRub(stats.yearMax)}
-              </span>
-            </div>
-
-            <div className="flex gap-2 sm:gap-3">
-              <div
-                className="flex w-11 shrink-0 flex-col justify-between text-right text-[10px] tabular-nums leading-none text-notion-muted sm:w-14"
-                style={{ height: PLOT_H }}
-              >
-                {[1, 0.75, 0.5, 0.25, 0].map((t) => (
-                  <span key={t}>{axisRubLabel(stats.maxBar * t)}</span>
-                ))}
-              </div>
-
-              <div className="min-w-0 flex-1">
+          <div className="dyn-legend">
+            <span className="legend-pill">
+              Столбец — месяц; сверху сумма (₽). Максимум —{' '}
+              <strong className="tabular-nums">{formatRub(stats.yearMax)}</strong>
+            </span>
+          </div>
+          <div className="bars">
+            {stats.yearMo.map(({ month, sum, count }) => {
+              const max = stats.maxBar;
+              const hPx =
+                max > 0 && sum > 0 ? Math.max(6, (sum / max) * 130) : sum === 0 ? 2 : 0;
+              const isPeak = max > 0 && sum > 0 && sum === max;
+              const mLabel = format(month, 'LLL', { locale: ru });
+              return (
                 <div
-                  className="relative border-l border-notion-border/50 pl-1"
-                  style={{ height: PLOT_H }}
+                  key={month.toISOString()}
+                  className="bar-col"
+                  title={
+                    sum > 0
+                      ? `${formatRub(sum)} · ${count} ${count === 1 ? 'запись' : 'записей'}`
+                      : `${mLabel}: нет данных`
+                  }
                 >
-                  {[1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className="pointer-events-none absolute left-0 right-0 border-t border-dashed border-notion-border/40"
-                      style={{ bottom: `${i * 25}%` }}
-                    />
-                  ))}
-
-                  <div className="absolute inset-0 flex gap-0.5 px-0.5 sm:gap-1">
-                    {stats.yearMo.map(({ month, sum, count }) => {
-                      const safeMax = stats.maxBar;
-                      const plotInner = PLOT_H - 22;
-                      const barH = safeMax > 0 ? (sum / safeMax) * plotInner : 0;
-                      const hPx = sum > 0 ? Math.max(barH, 3) : 0;
-                      const mLabel = format(month, 'LLL', { locale: ru });
-                      return (
-                        <div
-                          key={month.toISOString()}
-                          className="flex h-full min-w-0 flex-1 flex-col"
-                          title={
-                            sum > 0
-                              ? `${formatRub(sum)} · ${count} ${count === 1 ? 'запись' : 'записей'}`
-                              : `${mLabel}: нет данных`
-                          }
-                        >
-                          <div className="mb-1 shrink-0 text-center text-[9px] font-medium tabular-nums text-white/95 sm:text-[10px]">
-                            {barTopLabel(sum)}
-                          </div>
-                          <div className="flex min-h-0 flex-1 flex-col justify-end">
-                            <div
-                              className="mx-auto w-[80%] max-w-[40px] rounded-t-sm border border-violet-500/40 bg-violet-600 shadow-sm transition-colors hover:bg-violet-500"
-                              style={{ height: hPx }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="mt-1 flex gap-0.5 border-t border-notion-border/45 pt-2 sm:gap-1">
-                  {stats.yearMo.map(({ month, count }) => (
-                    <div
-                      key={`m-${month.toISOString()}`}
-                      className="flex min-w-0 flex-1 flex-col items-center gap-0.5 text-center"
-                    >
-                      <span className="text-[9px] tabular-nums leading-none text-notion-muted/90 sm:text-[10px]">
-                        {count > 0 ? `${count} з.` : '—'}
-                      </span>
-                      <span className="text-[9px] capitalize leading-tight text-notion-muted sm:text-[10px]">
-                        {format(month, 'LLL', { locale: ru })}
-                      </span>
+                  <div className="bar-value">{barTopLabel(sum)}</div>
+                  <div className="bar-track">
+                    <div className={`bar-fill ${isPeak ? 'peak' : ''}`} style={{ height: `${hPx}px` }}>
+                      {isPeak ? <div className="bar-peak-dot" /> : null}
                     </div>
-                  ))}
+                  </div>
+                  <div className="bar-label">{mLabel}</div>
+                  <span className="small faint tabular-nums">{count > 0 ? `${count} з.` : '—'}</span>
                 </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-notion-border bg-notion-surface p-4 sm:p-6">
+      <div className="card">
         <div className="flex items-center justify-between gap-2 mb-4">
           <div>
-            <h2 className="text-sm font-semibold text-white">Ближайшие съёмки</h2>
-            <p className="text-xs text-notion-muted mt-0.5 leading-relaxed">
+            <h2 className="card-title">Ближайшие съёмки</h2>
+            <p className="card-sub">
               От сегодня до конца {format(new Date(), 'yyyy')} года · статусы «Записан» и «Переговоры»
             </p>
           </div>
@@ -782,49 +668,48 @@ export function DashboardView({ bookings, monthCursor, fields, onOpenBooking, da
             Нет подходящих записей до конца года
           </p>
         ) : (
-          <ul className="max-h-[min(480px,60vh)] divide-y divide-notion-border overflow-y-auto rounded-xl border border-notion-border">
-            {stats.upcoming.map((b) => {
-              const st = pillDisplayForField(fields, 'status', b.status);
-              const src = pillDisplayForField(fields, 'sourceId', b.sourceId);
-              return (
-                <li key={b.id}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenBooking(b.id)}
-                    className="w-full flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 text-left hover:bg-notion-hover/50 transition-colors touch-manipulation group"
-                  >
-                    <div className="shrink-0 text-center min-w-[3rem] sm:min-w-[3.5rem]">
-                      <div className="text-xs text-notion-muted leading-tight">
-                        {format(parseISO(b.date), 'd MMM', { locale: ru })}
-                      </div>
-                      <div className="text-[10px] text-notion-muted/70 capitalize">
-                        {format(parseISO(b.date), 'EEE', { locale: ru })}
-                      </div>
+          <ul className="max-h-[min(480px,60vh)] divide-y divide-[color:var(--border)] overflow-y-auto rounded-[var(--radius-lg)] border border-[color:var(--border)]">
+            {stats.upcoming.map((b) => (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenBooking(b.id)}
+                  className="w-full flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 text-left hover:bg-[var(--surface-hover)] transition-colors touch-manipulation group"
+                >
+                  <div className="shrink-0 text-center min-w-[3rem] sm:min-w-[3.5rem]">
+                    <div className="text-xs muted leading-tight">
+                      {format(parseISO(b.date), 'd MMM', { locale: ru })}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-white truncate group-hover:text-violet-200 transition-colors">
-                        {b.title || 'Без названия'}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {b.timeRange ? (
-                          <span className="text-xs text-sky-200/90 font-medium tabular-nums">{b.timeRange}</span>
-                        ) : null}
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${st.className}`}>{st.label}</span>
-                        {src.label ? (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${src.className}`}>{src.label}</span>
-                        ) : null}
-                      </div>
+                    <div className="text-[10px] faint capitalize">
+                      {format(parseISO(b.date), 'EEE', { locale: ru })}
                     </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-sm font-semibold text-emerald-200 tabular-nums">{formatRub(b.amount)}</div>
-                      <ArrowRight className="w-4 h-4 text-notion-muted opacity-0 group-hover:opacity-100 transition-opacity ml-auto mt-1 hidden sm:block" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate group-hover:opacity-90 transition-opacity" style={{ color: 'var(--text)' }}>
+                      {b.title || 'Без названия'}
                     </div>
-                  </button>
-                </li>
-              );
-            })}
+                    <div className="flex flex-wrap gap-1.5 mt-1 items-center">
+                      {b.timeRange ? (
+                        <span className="text-xs font-medium tabular-nums" style={{ color: 'var(--status-progress)' }}>
+                          {b.timeRange}
+                        </span>
+                      ) : null}
+                      <BookingStatusChip fields={fields} status={b.status} />
+                      <BookingSourceChip fields={fields} sourceId={b.sourceId} />
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-sm font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>
+                      {formatRub(b.amount)}
+                    </div>
+                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity ml-auto mt-1 hidden sm:block faint" />
+                  </div>
+                </button>
+              </li>
+            ))}
           </ul>
         )}
+      </div>
       </div>
     </div>
   );

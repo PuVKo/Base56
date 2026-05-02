@@ -8,11 +8,15 @@ export default {
       },
       colors: {
         notion: {
-          bg: '#191919',
-          surface: '#252525',
-          border: '#373737',
-          hover: '#2f2f2f',
-          muted: '#9b9b9b',
+          bg: 'rgb(var(--notion-bg) / <alpha-value>)',
+          surface: 'rgb(var(--notion-surface) / <alpha-value>)',
+          border: 'rgb(var(--notion-border) / <alpha-value>)',
+          hover: 'rgb(var(--notion-hover) / <alpha-value>)',
+          muted: 'rgb(var(--notion-muted) / <alpha-value>)',
+          fg: 'rgb(var(--notion-fg) / <alpha-value>)',
+        },
+        brand: {
+          DEFAULT: 'rgb(var(--brand-rgb) / <alpha-value>)',
         },
       },
     },

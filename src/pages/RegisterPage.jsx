@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PasswordInput } from '@/components/PasswordInput.jsx';
+import { AuthThemeToggle } from '@/components/ThemeToggle.jsx';
 import { apiFetch } from '@/lib/api';
 import { registerSchema } from '@/lib/validation';
 
@@ -59,11 +60,15 @@ export default function RegisterPage() {
 
   if (done) {
     return (
-      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-notion-bg px-4">
+      <div className="relative min-h-screen min-h-[100dvh] bg-notion-bg px-4">
+        <AuthThemeToggle
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-10"
+        />
+        <div className="flex min-h-screen min-h-[100dvh] items-center justify-center">
         <div className="w-full max-w-sm rounded-xl border border-notion-border bg-notion-surface/90 p-6 shadow-xl text-center">
-          <h1 className="text-xl font-semibold text-white mb-2">Проверьте почту</h1>
+          <h1 className="text-xl font-semibold text-notion-fg mb-2">Проверьте почту</h1>
           <p className="text-sm text-notion-muted mb-4">
-            Мы отправили ссылку для подтверждения на <span className="text-white/90">{email}</span>.
+            Мы отправили ссылку для подтверждения на <span className="text-notion-fg/90">{email}</span>.
           </p>
           <div className="flex items-center justify-center gap-4 mb-4">
             <button
@@ -74,20 +79,25 @@ export default function RegisterPage() {
             >
               {resending ? 'Отправка…' : 'Отправить письмо снова'}
             </button>
-            <Link to="/login" className="inline-block text-sm text-white/90 hover:text-white">
+            <Link to="/login" className="inline-block text-sm text-notion-fg/90 hover:text-notion-fg">
               Ко входу
             </Link>
           </div>
           {resendMsg ? <p className="text-sm text-notion-muted mb-4">{resendMsg}</p> : null}
+        </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-notion-bg px-4">
+    <div className="relative min-h-screen min-h-[100dvh] bg-[var(--bg)] px-4">
+      <AuthThemeToggle
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-10"
+      />
+      <div className="flex min-h-screen min-h-[100dvh] items-center justify-center">
       <div className="w-full max-w-sm rounded-xl border border-notion-border bg-notion-surface/90 p-6 shadow-xl">
-        <h1 className="text-xl font-semibold text-white mb-1">Регистрация</h1>
+        <h1 className="text-xl font-semibold text-notion-fg mb-1">Регистрация</h1>
         <p className="text-sm text-notion-muted mb-6">Создайте аккаунт Base56</p>
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
@@ -100,7 +110,7 @@ export default function RegisterPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-violet-500/50"
+              className="w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-notion-fg outline-none focus:ring-1 focus:ring-brand/55"
               required
             />
           </div>
@@ -114,7 +124,7 @@ export default function RegisterPage() {
               autoComplete="username"
               value={login}
               onChange={(e) => setLogin(e.target.value)}
-              className="w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-violet-500/50"
+              className="w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-notion-fg outline-none focus:ring-1 focus:ring-brand/55"
             />
           </div>
           <div>
@@ -148,6 +158,7 @@ export default function RegisterPage() {
             Войти
           </Link>
         </p>
+      </div>
       </div>
     </div>
   );

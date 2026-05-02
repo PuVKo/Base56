@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AuthThemeToggle } from '@/components/ThemeToggle.jsx';
 import { apiFetch } from '@/lib/api';
 import { forgotPasswordSchema } from '@/lib/validation';
 
@@ -25,9 +26,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-notion-bg px-4">
+    <div className="relative min-h-screen min-h-[100dvh] bg-notion-bg px-4">
+      <AuthThemeToggle
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-10"
+      />
+      <div className="flex min-h-screen min-h-[100dvh] items-center justify-center">
       <div className="w-full max-w-sm rounded-xl border border-notion-border bg-notion-surface/90 p-6 shadow-xl">
-        <h1 className="text-xl font-semibold text-white mb-1">Сброс пароля</h1>
+        <h1 className="text-xl font-semibold text-notion-fg mb-1">Сброс пароля</h1>
         <p className="text-sm text-notion-muted mb-6">Укажите email — пришлём ссылку, если аккаунт найден.</p>
         {sent ? (
           <p className="text-sm text-notion-muted mb-4">
@@ -45,7 +50,7 @@ export default function ForgotPasswordPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-violet-500/50"
+                className="w-full rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-notion-fg outline-none focus:ring-1 focus:ring-brand/55"
                 required
               />
             </div>
@@ -63,6 +68,7 @@ export default function ForgotPasswordPage() {
             Назад ко входу
           </Link>
         </p>
+      </div>
       </div>
     </div>
   );

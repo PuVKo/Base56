@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
 const INPUT_CLASS =
-  'w-full rounded-lg border border-notion-border bg-notion-bg py-2 pl-3 pr-10 text-sm text-white outline-none focus:ring-1 focus:ring-violet-500/50';
+  'input w-full py-2 pl-3 pr-10 outline-none focus:ring-1 focus:ring-[color:var(--accent)]/40';
 
 /**
  * @param {{
@@ -31,7 +31,7 @@ export function PasswordInput({ id, value, onChange, autoComplete, required, min
       />
       <button
         type="button"
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1.5 text-notion-muted hover:bg-notion-border/30 hover:text-white outline-none focus-visible:ring-1 focus-visible:ring-violet-500/50"
+        className="login-eye absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 outline-none text-[color:var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]/40"
         aria-label={visible ? 'Скрыть пароль' : 'Показать пароль'}
         aria-pressed={visible}
         onClick={() => setVisible((v) => !v)}

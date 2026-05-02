@@ -65,6 +65,7 @@ export function normalizeGalleryTileFieldVisible(raw) {
  *   tableTileFieldsPanelOpen: boolean,
  *   dashboardPeriod: 'month' | 'year' | 'all',
  *   dashboardPeriodPanelOpen: boolean,
+ *   theme: 'dark' | 'light',
  * }} ClientUiPayload
  */
 
@@ -86,6 +87,7 @@ export function defaultClientUi() {
     tableTileFieldsPanelOpen: false,
     dashboardPeriod: 'month',
     dashboardPeriodPanelOpen: false,
+    theme: 'dark',
   };
 }
 
@@ -114,5 +116,6 @@ export function normalizeClientUi(raw) {
       o.dashboardPeriod === 'year' || o.dashboardPeriod === 'all' ? o.dashboardPeriod : 'month',
     dashboardPeriodPanelOpen:
       typeof o.dashboardPeriodPanelOpen === 'boolean' ? o.dashboardPeriodPanelOpen : false,
+    theme: o.theme === 'light' ? 'light' : 'dark',
   };
 }

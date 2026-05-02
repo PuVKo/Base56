@@ -100,6 +100,15 @@ export function isGalleryPrefsActive(prefs) {
 }
 
 /**
+ * На плитке/в карточке скрыто хотя бы одно поле — показываем точку на кнопке, пока панель закрыта.
+ * @param {Record<string, boolean> | undefined} tileVisible
+ */
+export function isGalleryTileFieldPrefsActive(tileVisible) {
+  if (!tileVisible || typeof tileVisible !== 'object') return false;
+  return Object.values(tileVisible).some((v) => v === false);
+}
+
+/**
  * Статус/источник/теги/поиск (без периода).
  * @param {any[]} list
  * @param {GalleryFilterPrefs} prefs

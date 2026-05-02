@@ -13,26 +13,32 @@ export const NOTION_COLOR_KEYS = [
   'red',
 ];
 
-/** Pill + selected ring styles (dark UI) */
+/**
+ * Непрозрачные фоны: не смешиваются с фоном страницы при смене светлой/тёмной темы
+ * (в отличие от полупрозрачных Tailwind-классов поверх --bg).
+ */
 const MAP = {
-  gray: 'bg-zinc-600/35 text-zinc-100 border-zinc-500/40',
-  brown: 'bg-amber-900/45 text-amber-100 border-amber-700/40',
-  orange: 'bg-orange-600/30 text-orange-100 border-orange-500/40',
-  yellow: 'bg-yellow-600/25 text-yellow-100 border-yellow-500/35',
-  green: 'bg-emerald-600/30 text-emerald-100 border-emerald-500/40',
-  blue: 'bg-blue-600/30 text-blue-100 border-blue-500/40',
-  purple: 'bg-violet-600/30 text-violet-100 border-violet-500/40',
-  pink: 'bg-pink-600/30 text-pink-100 border-pink-500/40',
-  red: 'bg-red-600/30 text-red-100 border-red-500/40',
+  gray: 'bg-zinc-700 text-zinc-50 border border-zinc-500/90',
+  brown: 'bg-amber-900 text-amber-50 border border-amber-700/90',
+  orange: 'bg-orange-800 text-orange-50 border border-orange-600/90',
+  yellow: 'bg-yellow-800 text-yellow-50 border border-yellow-600/90',
+  green: 'bg-emerald-800 text-emerald-50 border border-emerald-600/90',
+  blue: 'bg-blue-800 text-blue-50 border border-blue-600/90',
+  purple: 'bg-violet-800 text-violet-50 border border-violet-600/90',
+  pink: 'bg-pink-800 text-pink-50 border border-pink-600/90',
+  red: 'bg-red-800 text-red-50 border border-red-600/90',
 };
 
 /**
  * @param {string | undefined} color
  * @returns {string} Tailwind classes
  */
+/** Маркер для единого CSS-«фильтра» бейджей в светлой теме (`html.light .pill-chroma` в index.css) */
+export const PILL_CHROMA_CLASS = 'pill-chroma';
+
 export function notionPillClasses(color) {
   const k = NOTION_COLOR_KEYS.includes(/** @type {NotionColorKey} */ (color)) ? color : 'gray';
-  return MAP[k] || MAP.gray;
+  return `${MAP[k] || MAP.gray} ${PILL_CHROMA_CLASS}`;
 }
 
 /**

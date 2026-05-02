@@ -2,6 +2,7 @@ import { startTransition, useCallback, useEffect, useRef, useState } from 'react
 import { apiFetch } from '@/lib/api';
 import { clearLegacyGalleryLocalStorage, readLegacyClientUiFromLocalStorage } from '@/lib/galleryFilterPrefs';
 import { defaultClientUi, normalizeClientUi } from '@/lib/galleryPrefsModel';
+import { mergeClientUiThemeFromLs } from '@/theme/themeStorage';
 import { normalizeBooking, normalizeBookings } from '@/lib/bookingUtils';
 import { loadBookings, saveBookings } from '@/lib/storage';
 import { SYNC_INTERVAL_MS } from '@/lib/syncConstants';
@@ -330,7 +331,11 @@ export function useBookingsAndFields() {
   const refreshClientUi = useCallback(async () => {
     const r = await apiFetch('/api/user/ui-prefs');
     dirtyUiRef.current = false;
-    const merged = normalizeClientUi(r.clientUi ?? {});
+    const merged = mergeClientUiThemeFromLs(
+      normalizeClientUi(r.clientUi ?? {}),
+      r.persisted === true,
+      r.clientUi,
+    );
     setClientUi(merged);
     clientUiRef.current = merged;
   }, []);
@@ -506,6 +511,7 @@ export function useBookingsAndFields() {
         }
 
         let nextUi = uiPack.clientUi;
+        let persisted = uiPack.persisted === true;
         if (!uiPack.persisted) {
           const legacy = readLegacyClientUiFromLocalStorage();
           if (legacy) {
@@ -514,6 +520,7 @@ export function useBookingsAndFields() {
               clearLegacyGalleryLocalStorage();
               const again = await apiFetch('/api/user/ui-prefs');
               nextUi = again.clientUi;
+              persisted = again.persisted === true;
             } catch {
               /* оставляем с сервера */
             }
@@ -525,7 +532,7 @@ export function useBookingsAndFields() {
         serverBookingIdsRef.current = new Set(norm.map((b) => b.id));
         setBookings(norm);
         setFields((flds || []).sort((a, b) => a.sortOrder - b.sortOrder));
-        const mergedUi = normalizeClientUi(nextUi ?? {});
+        const mergedUi = mergeClientUiThemeFromLs(normalizeClientUi(nextUi ?? {}), persisted, nextUi);
         setClientUi(mergedUi);
         clientUiRef.current = mergedUi;
         setError(null);

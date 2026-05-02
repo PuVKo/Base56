@@ -157,7 +157,7 @@ export function BookingDateInput({ value, onChange, className }) {
         title="Календарь"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => setOpen((v) => !v)}
-        className="shrink-0 inline-flex items-center justify-center w-10 rounded-lg border border-notion-border bg-notion-bg text-notion-muted hover:bg-notion-hover hover:text-white transition-colors"
+        className="shrink-0 inline-flex items-center justify-center w-10 rounded-lg border border-notion-border bg-notion-bg text-notion-muted hover:bg-notion-hover hover:text-notion-fg transition-colors"
       >
         <Calendar className="w-4 h-4" strokeWidth={1.75} />
       </button>
@@ -174,11 +174,11 @@ export function BookingDateInput({ value, onChange, className }) {
               aria-label="Предыдущий месяц"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setMonth((m) => addMonths(m, -1))}
-              className="p-1.5 rounded-md text-notion-muted hover:bg-white/10 hover:text-white"
+              className="p-1.5 rounded-md text-notion-muted hover:bg-notion-hover hover:text-notion-fg"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs font-medium text-white capitalize truncate px-1">
+            <span className="text-xs font-medium text-notion-fg capitalize truncate px-1">
               {format(month, 'LLLL yyyy', { locale: ru })}
             </span>
             <button
@@ -186,7 +186,7 @@ export function BookingDateInput({ value, onChange, className }) {
               aria-label="Следующий месяц"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setMonth((m) => addMonths(m, 1))}
-              className="p-1.5 rounded-md text-notion-muted hover:bg-white/10 hover:text-white"
+              className="p-1.5 rounded-md text-notion-muted hover:bg-notion-hover hover:text-notion-fg"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -213,11 +213,11 @@ export function BookingDateInput({ value, onChange, className }) {
                   onClick={() => pickDay(day)}
                   className={[
                     'aspect-square max-h-8 text-xs rounded-md transition-colors tabular-nums',
-                    inMonth ? 'text-white' : 'text-notion-muted/45',
+                    inMonth ? 'text-notion-fg' : 'text-notion-muted/45',
                     isSel
-                      ? 'bg-violet-600 text-white font-semibold'
-                      : 'hover:bg-white/10',
-                    today && !isSel ? 'ring-1 ring-inset ring-violet-500/50' : '',
+                      ? 'bg-brand text-white font-semibold'
+                      : 'hover:bg-notion-hover',
+                    today && !isSel ? 'ring-1 ring-inset ring-brand/55' : '',
                   ].join(' ')}
                 >
                   {format(day, 'd')}
@@ -230,7 +230,7 @@ export function BookingDateInput({ value, onChange, className }) {
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={clearDate}
-            className="mt-2 w-full text-center text-xs text-notion-muted hover:text-white py-1.5 rounded-md hover:bg-white/5"
+            className="mt-2 w-full text-center text-xs text-notion-muted hover:text-notion-fg py-1.5 rounded-md hover:bg-white/5"
           >
             Без даты
           </button>

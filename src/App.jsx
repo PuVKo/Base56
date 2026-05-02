@@ -1,22 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { addMonths, addYears, format, startOfMonth, startOfYear } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { addMonths, addYears, startOfMonth, startOfYear } from 'date-fns';
 import {
   AlertCircle,
-  CalendarRange,
   LayoutTemplate,
   ListFilter,
-  MoreVertical,
-  PanelLeft,
   Plus,
   RefreshCw,
 } from 'lucide-react';
 import { AssistantView } from '@/components/AssistantView';
 import { BookingModal } from '@/components/BookingModal';
 import { CalendarView } from '@/components/CalendarView';
-import { DashboardPeriodPanelContent } from '@/components/DashboardPeriodPanel';
+import { DashboardPeriodTopRow } from '@/components/DashboardPeriodPanel';
 import { DashboardView } from '@/components/DashboardView';
-import { FloatingSidePanel } from '@/components/FloatingSidePanel';
 import { GalleryView } from '@/components/GalleryView';
 import { MobileNav } from '@/components/MobileNav';
 import { MonthNav } from '@/components/MonthNav';
@@ -24,24 +19,32 @@ import { YearNav } from '@/components/YearNav';
 import { SettingsView } from '@/components/SettingsView';
 import { Sidebar } from '@/components/Sidebar';
 import { TableView } from '@/components/TableView';
+import { SettingsThemeToggle } from '@/components/ThemeToggle.jsx';
 import { useBookingsAndFields } from '@/hooks/useBookingsAndFields';
 import { filterByMonth } from '@/lib/bookingUtils';
 import { createEmptyBooking } from '@/lib/emptyBooking';
 import { formatRub } from '@/lib/format';
-import { isGalleryPrefsActive, isViewFiltersActive } from '@/lib/galleryFilterPrefs';
+import {
+  isGalleryPrefsActive,
+  isGalleryTileFieldPrefsActive,
+  isViewFiltersActive,
+} from '@/lib/galleryFilterPrefs';
+import { useTheme } from '@/theme/ThemeProvider.jsx';
+import { runViewTransition } from '@/viewTransition.js';
 
 const SIDEBAR_KEY = 'base56-sidebar-open';
 const LEGACY_SIDEBAR_KEY = 'photocrm-sidebar-open';
 
-function readSidebarOpen() {
+function readSidebarCollapsed() {
   try {
     const v = localStorage.getItem(SIDEBAR_KEY);
-    if (v !== null) return v !== '0';
+    if (v === '0') return true;
+    if (v === '1') return false;
     const legacy = localStorage.getItem(LEGACY_SIDEBAR_KEY);
-    if (legacy !== null) return legacy !== '0';
-    return true;
+    if (legacy === '0') return true;
+    return false;
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -81,38 +84,38 @@ export default function App({ currentUser = null }) {
     deleteFieldLocal,
     reorderFieldsLocal,
   } = useBookingsAndFields();
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    if (!ready) return;
+    setTheme(clientUi.theme);
+  }, [ready, clientUi.theme, setTheme]);
+
   const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
   const [activeView, setActiveView] = useState('dashboard');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalBooking, setModalBooking] = useState(null);
-  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(() => readSidebarOpen());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarCollapsed());
   const [settingsTab, setSettingsTab] = useState(/** @type {'profile' | 'fields'} */ ('fields'));
   const [toast, setToast] = useState('');
-  const [calendarMobileMenuOpen, setCalendarMobileMenuOpen] = useState(false);
-  const calendarMobileMenuRef = useRef(/** @type {HTMLDivElement | null} */ (null));
-
-  useEffect(() => {
-    if (!calendarMobileMenuOpen) return;
-    function onDoc(/** @type {MouseEvent | TouchEvent} */ e) {
-      const el = calendarMobileMenuRef.current;
-      if (el && e.target instanceof Node && !el.contains(e.target)) setCalendarMobileMenuOpen(false);
-    }
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('touchstart', onDoc, { passive: true });
-    return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('touchstart', onDoc);
-    };
-  }, [calendarMobileMenuOpen]);
-
   function setMainView(/** @type {string} */ view) {
-    setActiveView(view);
-    if (view === 'settings') setSettingsTab('fields');
+    runViewTransition(() => {
+      setActiveView(view);
+      if (view === 'settings') setSettingsTab('fields');
+    });
   }
 
   function openProfileSettings() {
-    setActiveView('settings');
-    setSettingsTab('profile');
+    runViewTransition(() => {
+      setActiveView('settings');
+      setSettingsTab('profile');
+    });
+  }
+
+  function setSettingsTabWithTransition(/** @type {'profile' | 'fields'} */ tab) {
+    runViewTransition(() => {
+      setSettingsTab(tab);
+    });
   }
 
   const galleryPeriodMode = clientUi.galleryFilters.period;
@@ -129,28 +132,19 @@ export default function App({ currentUser = null }) {
   const tableTileFieldsOpen = clientUi.tableTileFieldsPanelOpen;
   const tableFiltersActiveHint = isGalleryPrefsActive(clientUi.tableFilters);
 
+  const galleryTileFieldsActiveHint = isGalleryTileFieldPrefsActive(clientUi.galleryTileFieldVisible);
+  const calendarTileFieldsActiveHint = isGalleryTileFieldPrefsActive(clientUi.calendarTileFieldVisible);
+  const tableTileFieldsActiveHint = isGalleryTileFieldPrefsActive(clientUi.tableTileFieldVisible);
+
   const dashboardPeriod = clientUi.dashboardPeriod;
-  const dashboardPeriodPanelOpen = clientUi.dashboardPeriodPanelOpen;
-  const dashboardSubtitle = useMemo(() => {
-    if (dashboardPeriod === 'all') return 'Всё время';
-    if (dashboardPeriod === 'year') return `${format(monthCursor, 'yyyy', { locale: ru })} год`;
-    return format(monthCursor, 'LLLL yyyy', { locale: ru });
-  }, [dashboardPeriod, monthCursor]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(SIDEBAR_KEY, desktopSidebarOpen ? '1' : '0');
+      localStorage.setItem(SIDEBAR_KEY, sidebarCollapsed ? '0' : '1');
     } catch {
       /* ignore */
     }
-  }, [desktopSidebarOpen]);
-
-  useEffect(() => {
-    if (activeView === 'dashboard') return;
-    updateClientUi((prev) =>
-      prev.dashboardPeriodPanelOpen ? { ...prev, dashboardPeriodPanelOpen: false } : prev,
-    );
-  }, [activeView, updateClientUi]);
+  }, [sidebarCollapsed]);
 
   const monthBookings = useMemo(
     () => filterByMonth(bookings, monthCursor),
@@ -226,7 +220,7 @@ export default function App({ currentUser = null }) {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-notion-bg text-notion-muted">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-[var(--bg)] text-[var(--text-muted)]">
         Загрузка…
       </div>
     );
@@ -238,7 +232,7 @@ export default function App({ currentUser = null }) {
       /failed to fetch|networkerror|load failed|econnrefused|connection refused|cors/i.test(errText);
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-notion-bg text-notion-muted px-6 text-center max-w-lg mx-auto">
-        <p className="text-white font-medium mb-2">Не удалось связаться с API</p>
+        <p className="text-notion-fg font-medium mb-2">Не удалось связаться с API</p>
         {looksLikeNetwork ? (
           <p className="text-sm mb-4 text-left w-full">
             Чаще всего не запущен сервер на порту <span className="text-notion-muted">3001</span> или открыт не тот
@@ -255,7 +249,7 @@ export default function App({ currentUser = null }) {
             <span className="text-notion-muted">postgresql://…</span>, см. <span className="text-notion-muted">server/.env.example</span>.
           </p>
         )}
-        <code className="text-xs text-left w-full bg-notion-surface border border-notion-border rounded-lg p-3 text-emerald-200/90 whitespace-pre-wrap">
+        <code className="text-xs text-left w-full bg-notion-surface border border-notion-border rounded-lg p-3 text-brand/85 whitespace-pre-wrap">
           cd /path/to/Base56{'\n'}
           npm install && npm install --prefix server{'\n'}
           npm run dev
@@ -274,46 +268,54 @@ export default function App({ currentUser = null }) {
   const showMonthChrome = activeView !== 'settings' && activeView !== 'assistant';
 
   return (
-    <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-notion-bg">
+    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar
         activeView={activeView}
         onViewChange={setMainView}
         onOpenProfileSettings={openProfileSettings}
-        open={desktopSidebarOpen}
-        onCollapse={() => setDesktopSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         currentUser={currentUser}
+        clientUi={clientUi}
+        updateClientUi={updateClientUi}
       />
-      <main className="flex-1 flex flex-col min-w-0 min-h-0 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0">
-        <header className="border-b border-notion-border px-3 sm:px-6 py-3 sm:py-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4 bg-notion-bg/95 pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-3">
-          <div className="flex items-start sm:items-center gap-2 min-w-0 w-full sm:w-auto sm:flex-1">
-            {!desktopSidebarOpen ? (
-              <button
-                type="button"
-                onClick={() => setDesktopSidebarOpen(true)}
-                className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-notion-border text-notion-muted hover:bg-notion-hover hover:text-white transition-colors shrink-0"
-                title="Показать боковое меню"
-                aria-label="Показать боковое меню"
-              >
-                <PanelLeft className="w-4 h-4 shrink-0 opacity-90" />
-                <span className="text-xs font-medium leading-none">Меню</span>
-              </button>
-            ) : null}
-            <div className="min-w-0 flex-1">
+      <main className="main pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0 pt-[max(0px,env(safe-area-inset-top))]">
+        <header
+          className={`topbar flex-wrap gap-y-2 md:flex-nowrap md:items-center md:gap-y-0 ${
+            showMonthChrome
+              ? 'md:box-border md:h-[4.25rem] md:min-h-[4.25rem] md:max-h-[4.25rem] md:overflow-hidden md:py-2.5 md:leading-none'
+              : ''
+          }`}
+        >
+          <div className="flex w-full min-w-0 items-center justify-between gap-3 md:contents">
+            <div className="topbar-left min-w-0 flex-1">
+              <div className="min-w-0 flex-1">
               {activeView === 'settings' ? (
-                <h1 className="text-lg font-semibold text-white">
-                  {settingsTab === 'profile' ? 'Профиль' : 'Настройки'}
-                </h1>
+                <>
+                  <span className="crumb-label">Настройки</span>
+                  <h1 className="page-title">
+                    {settingsTab === 'profile' ? 'Профиль' : 'Поля и карточка'}
+                  </h1>
+                </>
               ) : activeView === 'assistant' ? (
-                <h1 className="text-lg font-semibold text-white">Ассистент</h1>
+                <>
+                  <span className="crumb-label">Чат</span>
+                  <h1 className="page-title">Ассистент</h1>
+                </>
               ) : activeView === 'dashboard' ? (
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-xs text-notion-muted uppercase tracking-wide">Дашборд</span>
-                  <p className="text-sm sm:text-base font-semibold text-white capitalize truncate leading-tight">
-                    {dashboardSubtitle}
-                  </p>
-                </div>
+                <DashboardPeriodTopRow
+                  dashboardPeriod={dashboardPeriod}
+                  monthCursor={monthCursor}
+                  setMonthCursor={setMonthCursor}
+                  onChangePeriod={(next) =>
+                    updateClientUi((prev) => ({ ...prev, dashboardPeriod: next }))
+                  }
+                />
               ) : activeView === 'gallery' && galleryPeriodMode === 'all' ? (
-                <h1 className="text-lg font-semibold text-white">Плитки</h1>
+                <>
+                  <span className="crumb-label">Записи</span>
+                  <h1 className="page-title">Плитки</h1>
+                </>
               ) : activeView === 'gallery' && galleryPeriodMode === 'year' ? (
                 <YearNav
                   monthCursor={monthCursor}
@@ -322,7 +324,10 @@ export default function App({ currentUser = null }) {
                   onToday={() => setMonthCursor(startOfMonth(startOfYear(new Date())))}
                 />
               ) : activeView === 'table' && tablePeriodMode === 'all' ? (
-                <h1 className="text-lg font-semibold text-white">Таблица</h1>
+                <>
+                  <span className="crumb-label">Записи</span>
+                  <h1 className="page-title">Таблица</h1>
+                </>
               ) : activeView === 'table' && tablePeriodMode === 'year' ? (
                 <YearNav
                   monthCursor={monthCursor}
@@ -338,116 +343,24 @@ export default function App({ currentUser = null }) {
                   onToday={() => setMonthCursor(startOfMonth(new Date()))}
                 />
               )}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center md:hidden min-w-[5.5rem]">
+              <SettingsThemeToggle
+                clientUi={clientUi}
+                updateClientUi={updateClientUi}
+                className="w-full min-w-[5.5rem]"
+              />
             </div>
           </div>
           {showMonthChrome ? (
-            <>
-              {activeView === 'calendar' ? (
-                <div className="md:hidden flex flex-row items-center justify-end gap-2 w-full shrink-0">
-                  <div className="relative shrink-0" ref={calendarMobileMenuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setCalendarMobileMenuOpen((o) => !o)}
-                      aria-expanded={calendarMobileMenuOpen}
-                      aria-haspopup="menu"
-                      className="relative inline-flex items-center justify-center w-11 h-11 rounded-lg border border-notion-border text-notion-muted hover:bg-notion-hover hover:text-white transition-colors touch-manipulation"
-                      title="Ещё: фильтры, поля, итог"
-                    >
-                      <MoreVertical className="w-5 h-5" />
-                      {calendarFiltersActiveHint && !calendarFiltersOpen ? (
-                        <span
-                          className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-violet-400 shadow-sm"
-                          aria-hidden
-                        />
-                      ) : null}
-                    </button>
-                    {calendarMobileMenuOpen ? (
-                      <div
-                        className="absolute left-0 top-full z-[140] mt-1.5 w-[min(18rem,calc(100vw-1.5rem))] max-w-[calc(100vw-env(safe-area-inset-left,0px)-env(safe-area-inset-right,0px)-1.5rem)] origin-top-left rounded-xl border border-notion-border bg-notion-bg shadow-2xl py-1 text-sm"
-                        role="menu"
-                      >
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className={`relative flex w-full items-center gap-2 px-3 py-2.5 text-left font-medium touch-manipulation ${
-                            calendarFiltersOpen
-                              ? 'bg-violet-500/15 text-violet-100'
-                              : 'text-white hover:bg-notion-hover'
-                          }`}
-                          onClick={() => {
-                            setCalendarMobileMenuOpen(false);
-                            updateClientUi((prev) => {
-                              const next = !prev.calendarFiltersPanelOpen;
-                              return {
-                                ...prev,
-                                calendarFiltersPanelOpen: next,
-                                calendarTileFieldsPanelOpen: next ? false : prev.calendarTileFieldsPanelOpen,
-                              };
-                            });
-                          }}
-                        >
-                          <ListFilter className="w-4 h-4 shrink-0 opacity-90" />
-                          Фильтры
-                          {calendarFiltersActiveHint && !calendarFiltersOpen ? (
-                            <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full bg-violet-400" aria-hidden />
-                          ) : null}
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className={`flex w-full items-center gap-2 px-3 py-2.5 text-left font-medium touch-manipulation ${
-                            calendarTileFieldsOpen
-                              ? 'bg-violet-500/15 text-violet-100'
-                              : 'text-white hover:bg-notion-hover'
-                          }`}
-                          onClick={() => {
-                            setCalendarMobileMenuOpen(false);
-                            updateClientUi((prev) => {
-                              const next = !prev.calendarTileFieldsPanelOpen;
-                              return {
-                                ...prev,
-                                calendarTileFieldsPanelOpen: next,
-                                calendarFiltersPanelOpen: next ? false : prev.calendarFiltersPanelOpen,
-                              };
-                            });
-                          }}
-                        >
-                          <LayoutTemplate className="w-4 h-4 shrink-0 opacity-90" />
-                          Поля карточки
-                        </button>
-                        <div
-                          className="mx-2 my-1.5 rounded-lg border border-emerald-500/25 bg-emerald-950/35 px-2.5 py-2"
-                          role="presentation"
-                        >
-                          <span className="text-[9px] font-medium uppercase tracking-wide text-emerald-200/65">
-                            Итого за месяц
-                          </span>
-                          <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            <span className="text-base font-semibold text-emerald-100 tabular-nums">
-                              {formatRub(monthTotalRub)}
-                            </span>
-                            <span className="text-[10px] text-emerald-200/40 tabular-nums">
-                              {monthBookings.length} {pluralRecordsRu(monthBookings.length)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => openNew()}
-                    className="inline-flex flex-1 min-w-0 items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white text-notion-bg text-sm font-medium hover:bg-white/90 transition-colors shadow-sm touch-manipulation"
-                  >
-                    <Plus className="w-4 h-4 shrink-0" />
-                    Новая запись
-                  </button>
-                </div>
-              ) : null}
+            <div className="topbar-right flex-wrap justify-end md:flex-nowrap md:overflow-x-auto md:overflow-y-visible overscroll-x-contain [scrollbar-width:thin]">
               <div
-                className={`${
-                  activeView === 'calendar' ? 'hidden md:flex' : 'flex'
-                } flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto sm:shrink-0 sm:justify-end`}
+                className={
+                  activeView === 'calendar' || activeView === 'gallery' || activeView === 'table'
+                    ? 'grid w-full min-w-0 grid-cols-2 items-stretch gap-2 sm:flex sm:flex-row sm:flex-nowrap sm:items-center sm:gap-3 sm:justify-end sm:w-auto sm:shrink-0'
+                    : 'flex w-full min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:gap-3 sm:justify-end sm:w-auto sm:shrink-0'
+                }
               >
               {activeView === 'gallery' || activeView === 'calendar' || activeView === 'table' ? (
                 <>
@@ -491,24 +404,26 @@ export default function App({ currentUser = null }) {
                         ? 'Скрыть фильтры'
                         : 'Показать фильтры'
                     }
-                    className={`relative inline-flex items-center justify-center gap-2 w-full sm:w-auto px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors touch-manipulation shrink-0 ${
+                    className={`inline-flex h-10 min-h-10 max-h-10 min-w-0 items-center justify-center gap-1.5 px-2.5 w-full sm:w-auto sm:gap-2 sm:px-3 rounded-full border text-sm font-medium leading-none transition-colors touch-manipulation shrink-0 ${
                       (activeView === 'gallery' ? galleryFiltersOpen : activeView === 'calendar' ? calendarFiltersOpen : tableFiltersOpen)
-                        ? 'border-violet-500/50 bg-violet-500/15 text-violet-100'
-                        : 'border-notion-border text-notion-muted hover:bg-notion-hover hover:text-white'
+                        ? 'border-brand/45 bg-brand/15 text-brand'
+                        : 'border-notion-border text-notion-muted hover:bg-notion-hover hover:text-notion-fg'
                     }`}
                   >
                     <ListFilter className="w-4 h-4 shrink-0" />
-                    Фильтры
-                    {(activeView === 'gallery'
-                      ? galleryFiltersActiveHint && !galleryFiltersOpen
-                      : activeView === 'calendar'
-                        ? calendarFiltersActiveHint && !calendarFiltersOpen
-                        : tableFiltersActiveHint && !tableFiltersOpen) ? (
-                      <span
-                        className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-violet-400 shadow-sm"
-                        aria-hidden
-                      />
-                    ) : null}
+                    <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+                      Фильтры
+                      {(activeView === 'gallery'
+                        ? galleryFiltersActiveHint && !galleryFiltersOpen
+                        : activeView === 'calendar'
+                          ? calendarFiltersActiveHint && !calendarFiltersOpen
+                          : tableFiltersActiveHint && !tableFiltersOpen) ? (
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--accent)]"
+                          aria-hidden
+                        />
+                      ) : null}
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -554,54 +469,45 @@ export default function App({ currentUser = null }) {
                           ? 'Скрыть настройку полей'
                           : 'Поля карточки'
                     }
-                    className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors touch-manipulation shrink-0 ${
+                    className={`inline-flex h-10 min-h-10 max-h-10 min-w-0 items-center justify-center gap-1.5 px-2.5 w-full sm:w-auto sm:gap-2 sm:px-3 rounded-full border text-sm font-medium leading-none transition-colors touch-manipulation shrink-0 ${
                       (activeView === 'gallery'
                         ? galleryTileFieldsOpen
                         : activeView === 'calendar'
                           ? calendarTileFieldsOpen
                           : tableTileFieldsOpen)
-                        ? 'border-violet-500/50 bg-violet-500/15 text-violet-100'
-                        : 'border-notion-border text-notion-muted hover:bg-notion-hover hover:text-white'
+                        ? 'border-brand/45 bg-brand/15 text-brand'
+                        : 'border-notion-border text-notion-muted hover:bg-notion-hover hover:text-notion-fg'
                     }`}
                   >
                     <LayoutTemplate className="w-4 h-4 shrink-0" />
-                    {activeView === 'table' ? 'Поля таблицы' : 'Поля карточки'}
+                    <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+                      {activeView === 'table' ? 'Поля таблицы' : 'Поля карточки'}
+                      {(activeView === 'gallery'
+                        ? galleryTileFieldsActiveHint && !galleryTileFieldsOpen
+                        : activeView === 'calendar'
+                          ? calendarTileFieldsActiveHint && !calendarTileFieldsOpen
+                          : tableTileFieldsActiveHint && !tableTileFieldsOpen) ? (
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--accent)]"
+                          aria-hidden
+                        />
+                      ) : null}
+                    </span>
                   </button>
                 </>
               ) : null}
-              {activeView === 'dashboard' ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateClientUi((prev) => ({
-                      ...prev,
-                      dashboardPeriodPanelOpen: !prev.dashboardPeriodPanelOpen,
-                    }))
-                  }
-                  aria-pressed={dashboardPeriodPanelOpen}
-                  title={dashboardPeriodPanelOpen ? 'Закрыть панель периода' : 'Период отчёта'}
-                  className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors touch-manipulation shrink-0 ${
-                    dashboardPeriodPanelOpen
-                      ? 'border-violet-500/50 bg-violet-500/15 text-violet-100'
-                      : 'border-notion-border text-notion-muted hover:bg-notion-hover hover:text-white'
-                  }`}
-                >
-                  <CalendarRange className="w-4 h-4 shrink-0" />
-                  Период
-                </button>
-              ) : null}
               {activeView !== 'dashboard' ? (
                 <div
-                  className="inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md border border-emerald-500/25 bg-emerald-950/35 px-2 py-1 sm:py-0.5 sm:px-2.5"
+                  className="flex h-10 min-h-10 max-h-10 w-full min-w-0 flex-nowrap items-center justify-center gap-x-1.5 whitespace-nowrap rounded-full border border-[color:var(--accent-soft-strong)] bg-[var(--accent-soft)] px-2 sm:inline-flex sm:w-auto sm:shrink-0 sm:justify-start sm:gap-x-2 sm:px-3"
                   title="Сумма полей «Сумма» по всем записям выбранного месяца"
                 >
-                  <span className="text-[9px] font-medium uppercase tracking-wide text-emerald-200/65 leading-tight">
+                  <span className="text-[9px] font-medium uppercase tracking-wide leading-none text-[color:var(--accent)]">
                     Итого за месяц
                   </span>
-                  <span className="text-base font-semibold text-emerald-100 tabular-nums leading-none tracking-tight">
+                  <span className="text-base font-semibold tabular-nums leading-none tracking-tight text-[color:var(--accent)]">
                     {formatRub(monthTotalRub)}
                   </span>
-                  <span className="text-[10px] text-emerald-200/40 tabular-nums leading-none">
+                  <span className="text-[10px] tabular-nums leading-none text-[color:var(--accent)]/75">
                     {monthBookings.length} {pluralRecordsRu(monthBookings.length)}
                   </span>
                 </div>
@@ -609,13 +515,13 @@ export default function App({ currentUser = null }) {
               <button
                 type="button"
                 onClick={() => openNew()}
-                className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-lg bg-white text-notion-bg text-sm font-medium hover:bg-white/90 transition-colors shadow-sm touch-manipulation shrink-0"
+                className="btn btn-primary h-10 min-h-10 max-h-10 w-full touch-manipulation sm:w-auto shrink-0 leading-none"
               >
-                <Plus className="w-4 h-4 shrink-0" />
+                <Plus className="shrink-0" aria-hidden />
                 Новая запись
               </button>
             </div>
-            </>
+          </div>
           ) : null}
         </header>
         {toast ? (
@@ -623,7 +529,8 @@ export default function App({ currentUser = null }) {
             {toast}
           </div>
         ) : null}
-        <div className="flex-1 p-3 sm:p-6 overflow-auto min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto [scrollbar-gutter:stable]">
+          <div className="view-transition-main min-h-full">
           {activeView === 'dashboard' ? (
             <DashboardView
               bookings={bookings}
@@ -686,23 +593,11 @@ export default function App({ currentUser = null }) {
               flushNow={flushNow}
               currentUser={currentUser}
               settingsTab={settingsTab}
-              onSettingsTabChange={setSettingsTab}
+              onSettingsTabChange={setSettingsTabWithTransition}
             />
           ) : null}
+          </div>
         </div>
-
-        <FloatingSidePanel
-          open={dashboardPeriodPanelOpen}
-          onClose={() => updateClientUi((prev) => ({ ...prev, dashboardPeriodPanelOpen: false }))}
-          title="Период отчёта"
-        >
-          <DashboardPeriodPanelContent
-            dashboardPeriod={dashboardPeriod}
-            monthCursor={monthCursor}
-            setMonthCursor={setMonthCursor}
-            onChangePeriod={(next) => updateClientUi((prev) => ({ ...prev, dashboardPeriod: next }))}
-          />
-        </FloatingSidePanel>
       </main>
 
       <BookingModal
@@ -725,7 +620,7 @@ export default function App({ currentUser = null }) {
           className="fixed z-[60] pointer-events-none left-3 right-3 sm:left-auto sm:right-5 sm:max-w-md bottom-[calc(4.75rem+env(safe-area-inset-bottom))] sm:bottom-6 md:bottom-6"
           aria-live="assertive"
         >
-          <div className="pointer-events-auto rounded-xl border border-notion-border/90 bg-[#252525]/95 backdrop-blur-md shadow-2xl px-3.5 py-3 text-sm text-white/95">
+          <div className="pointer-events-auto rounded-xl border border-notion-border/90 bg-notion-surface/95 backdrop-blur-md shadow-2xl px-3.5 py-3 text-sm text-notion-fg/95">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className="flex gap-2.5 min-w-0">
                 <AlertCircle className="w-5 h-5 shrink-0 text-amber-400/90 mt-0.5" aria-hidden />
@@ -740,7 +635,7 @@ export default function App({ currentUser = null }) {
                   clearSyncError();
                   void flushNow();
                 }}
-                className="shrink-0 inline-flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-2 rounded-lg border border-amber-500/35 bg-amber-950/40 text-amber-100 text-xs font-medium hover:bg-amber-900/50 transition-colors"
+                className="shrink-0 inline-flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-2 rounded-full border border-amber-500/35 bg-amber-950/40 text-amber-100 text-xs font-medium hover:bg-amber-900/50 transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" aria-hidden />
                 Повторить

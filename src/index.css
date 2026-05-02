@@ -1,26 +1,160 @@
+@import './styles/mockup-base.css';
+@import './styles/mockup-views.css';
+@import './styles/mockup-responsive.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* RGB triplets for Tailwind alpha modifiers: bg-notion-surface/90 */
+
+html.dark {
   color-scheme: dark;
+  --notion-bg: 10 10 10;
+  --notion-surface: 26 26 26;
+  --notion-border: 55 55 55;
+  --notion-hover: 47 47 47;
+  --notion-muted: 161 161 161;
+  --notion-fg: 255 255 255;
+  /* Приглушённый коралл (раньше 255 122 92 — слишком насыщенный на тёмном фоне) */
+  --brand-rgb: 188 118 98;
+}
+
+/* Резерв под вертикальный скролл — без этого при смене вкладок «плывёт» центрированная вёрстка */
+html {
+  scrollbar-gutter: stable;
+}
+
+html.light {
+  color-scheme: light;
+  --notion-bg: 255 255 255;
+  --notion-surface: 249 249 249;
+  --notion-border: 229 229 229;
+  --notion-hover: 240 240 240;
+  --notion-muted: 82 82 82;
+  --notion-fg: 10 10 10;
+  --brand-rgb: 188 118 98;
+}
+
+/*
+ * Один «фильтр» для всех цветных бейджей (источник / тег / статус из БД).
+ * Палитра та же; на светлом фоне слегка усиливаем насыщенность и приглушаем яркость.
+ */
+html.light .pill-chroma {
+  filter: brightness(0.97) contrast(1.04) saturate(1.12);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   min-height: 100dvh;
-  background: #191919;
-  color: #e6e6e6;
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
-input[type='date']::-webkit-calendar-picker-indicator,
-input[type='time']::-webkit-calendar-picker-indicator {
+html.dark input[type='date']::-webkit-calendar-picker-indicator,
+html.dark input[type='time']::-webkit-calendar-picker-indicator {
   filter: invert(0.75);
   cursor: pointer;
+}
+
+html.light input[type='date']::-webkit-calendar-picker-indicator,
+html.light input[type='time']::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+/* View Transitions API — main shell + settings tab panels */
+@supports (view-transition-name: none) {
+  .view-transition-main {
+    view-transition-name: main-content;
+  }
+
+  .view-transition-settings-panel {
+    view-transition-name: settings-panel;
+  }
+}
+
+@keyframes vt-main-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes vt-main-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Только прозрачность — без translateY, чтобы вкладки настроек не «плыли» по вертикали */
+@keyframes vt-settings-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-settings-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+::view-transition-old(main-content),
+::view-transition-new(main-content) {
+  animation-duration: 0.22s;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+::view-transition-old(main-content) {
+  animation-name: vt-main-out;
+}
+
+::view-transition-new(main-content) {
+  animation-name: vt-main-in;
+}
+
+::view-transition-old(settings-panel),
+::view-transition-new(settings-panel) {
+  animation-duration: 0.16s;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+::view-transition-old(settings-panel) {
+  animation-name: vt-settings-out;
+}
+
+::view-transition-new(settings-panel) {
+  animation-name: vt-settings-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

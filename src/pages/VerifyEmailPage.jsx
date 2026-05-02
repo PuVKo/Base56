@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { AuthThemeToggle } from '@/components/ThemeToggle.jsx';
 import { apiFetch } from '@/lib/api';
 
 export default function VerifyEmailPage() {
@@ -35,12 +36,16 @@ export default function VerifyEmailPage() {
   }, [params]);
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-notion-bg px-4">
+    <div className="relative min-h-screen min-h-[100dvh] bg-notion-bg px-4">
+      <AuthThemeToggle
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-10"
+      />
+      <div className="flex min-h-screen min-h-[100dvh] items-center justify-center">
       <div className="w-full max-w-sm rounded-xl border border-notion-border bg-notion-surface/90 p-6 shadow-xl text-center">
         {status === 'loading' ? <p className="text-notion-muted">Подтверждение…</p> : null}
         {status === 'ok' ? (
           <>
-            <h1 className="text-xl font-semibold text-white mb-2">Готово</h1>
+            <h1 className="text-xl font-semibold text-notion-fg mb-2">Готово</h1>
             <p className="text-sm text-notion-muted mb-4">Email подтверждён. Теперь можно войти.</p>
             <Link to="/login?verified=1" className="text-violet-300 hover:text-violet-200 text-sm font-medium">
               Перейти ко входу
@@ -56,6 +61,7 @@ export default function VerifyEmailPage() {
             </Link>
           </>
         ) : null}
+      </div>
       </div>
     </div>
   );

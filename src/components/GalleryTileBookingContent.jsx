@@ -4,6 +4,9 @@ import { formatDateDdMm, formatRub } from '@/lib/format';
 import { getFieldOptionItems, pillDisplayForField, tagPillFromFieldOrConstants } from '@/lib/fieldOptions';
 import { notionPillClasses } from '@/lib/notionColors';
 
+/** Как на событии календаря: `.chip` + `.chip-tag` из mockup-base + notionPillClasses из поля */
+const TILE_CHIP_CLASS = 'chip chip-tag max-w-full min-w-0';
+
 /**
  * Компактное значение поля на плитке (только для списка настроенных полей).
  * @param {any} field
@@ -23,22 +26,24 @@ function renderFieldBlock(field, booking, fields, tagsField, ctx) {
     case 'url': {
       const s = typeof raw === 'string' ? raw.trim() : '';
       if (!s) return null;
-      return <p className="text-xs text-notion-muted line-clamp-2 break-words">{s}</p>;
+      return <p className="text-[12px] text-notion-fg/80 line-clamp-2 break-words leading-snug">{s}</p>;
     }
     case 'textarea': {
       const s = typeof raw === 'string' ? raw.trim() : '';
       if (!s) return null;
-      return <p className="text-xs text-notion-muted line-clamp-2 break-words">{s}</p>;
+      return <p className="text-[12px] text-notion-fg/80 line-clamp-2 break-words leading-relaxed">{s}</p>;
     }
     case 'number': {
       const n = typeof raw === 'number' ? raw : Number(raw);
       if (!Number.isFinite(n) && key !== 'amount') return null;
       if (key === 'amount') {
         return (
-          <div className="text-base font-semibold text-emerald-200/95 tabular-nums">{formatRub(Number.isFinite(n) ? n : 0)}</div>
+          <div className="text-[15px] font-semibold tabular-nums leading-none tracking-tight text-[color:var(--accent)]">
+            {formatRub(Number.isFinite(n) ? n : 0)}
+          </div>
         );
       }
-      return <p className="text-xs text-notion-muted tabular-nums">{Number.isFinite(n) ? String(n) : '—'}</p>;
+      return <p className="text-[12px] text-notion-muted tabular-nums">{Number.isFinite(n) ? String(n) : '—'}</p>;
     }
     case 'date': {
       const s = typeof raw === 'string' ? raw.trim() : '';
@@ -47,7 +52,7 @@ function renderFieldBlock(field, booking, fields, tagsField, ctx) {
       const dd = formatDateDdMm(s);
       if (!dd && !tr) return null;
       return (
-        <div className="text-sm text-notion-muted tabular-nums">
+        <div className="text-[13px] sm:text-[14px] font-medium tabular-nums text-notion-fg/90">
           {dd ? (
             <>
               {dd}
@@ -69,19 +74,19 @@ function renderFieldBlock(field, booking, fields, tagsField, ctx) {
         const dd = formatDateDdMm(dateStr);
         if (dd && s) {
           return (
-            <div className="text-sm text-notion-muted tabular-nums">
+            <div className="text-[13px] sm:text-[14px] font-medium tabular-nums text-notion-fg/90">
               {dd} · {s}
             </div>
           );
         }
         if (!s) return null;
-        return <div className="text-sm text-notion-muted tabular-nums">{s}</div>;
+        return <div className="text-[13px] sm:text-[14px] font-medium tabular-nums text-notion-fg/90">{s}</div>;
       }
       if (!s) return null;
-      return <div className="text-sm text-notion-muted tabular-nums">{s}</div>;
+      return <div className="text-[13px] sm:text-[14px] font-medium tabular-nums text-notion-fg/90">{s}</div>;
     }
     case 'checkbox': {
-      return <span className="text-xs text-notion-muted">{raw ? 'Да' : 'Нет'}</span>;
+      return <span className="text-[12px] text-notion-muted">{raw ? 'Да' : 'Нет'}</span>;
     }
     case 'select':
     case 'status':
@@ -89,26 +94,22 @@ function renderFieldBlock(field, booking, fields, tagsField, ctx) {
       const pill = pillDisplayForField(fields, key, typeof raw === 'string' ? raw : '');
       if (field.type === 'source' || key === 'sourceId') {
         if (!pill.label) return null;
-        return (
-          <span className={`text-xs px-2 py-0.5 rounded-md inline-block ${pill.className}`}>{pill.label}</span>
-        );
+        return <span className={`${TILE_CHIP_CLASS} ${pill.className}`}>{pill.label}</span>;
       }
-      return (
-        <span className={`text-xs px-2 py-0.5 rounded-md inline-block ${pill.className}`}>{pill.label}</span>
-      );
+      return <span className={`${TILE_CHIP_CLASS} ${pill.className}`}>{pill.label}</span>;
     }
     case 'multiselect': {
       const arr = Array.isArray(raw) ? raw.filter((x) => typeof x === 'string') : [];
       if (!arr.length) return null;
       const items = getFieldOptionItems(field);
       return (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-[3px]">
           {arr.map((id) => {
             const opt = items.find((x) => x.id === id);
             const cls = opt ? notionPillClasses(opt.color || 'gray') : notionPillClasses('gray');
             const label = opt?.label ?? id;
             return (
-              <span key={id} className={`text-xs px-2 py-0.5 rounded-md ${cls}`}>
+              <span key={id} className={`${TILE_CHIP_CLASS} ${cls}`}>
                 {label}
               </span>
             );
@@ -120,12 +121,12 @@ function renderFieldBlock(field, booking, fields, tagsField, ctx) {
       const arr = Array.isArray(booking.tagIds) ? booking.tagIds.filter((x) => typeof x === 'string') : [];
       if (!arr.length) return null;
       return (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-[3px]">
           {arr.map((tid) => {
             const pill = tagPillFromFieldOrConstants(tagsField, tid);
             if (!pill) return null;
             return (
-              <span key={tid} className={`text-xs px-2 py-0.5 rounded-md ${pill.className}`}>
+              <span key={tid} className={`${TILE_CHIP_CLASS} ${pill.className}`}>
                 {pill.label}
               </span>
             );
@@ -136,24 +137,31 @@ function renderFieldBlock(field, booking, fields, tagsField, ctx) {
     case 'client': {
       const line = formatClientDisplay(raw);
       if (!line) return null;
-      return <div className="text-xs text-amber-200/80">Клиент: {line}</div>;
+      return (
+        <span className="inline-flex max-w-full min-w-0 items-center text-[12px] leading-snug text-amber-200/80">
+          Клиент: {line}
+        </span>
+      );
     }
     case 'comments': {
       const list = Array.isArray(raw) ? raw : [];
       if (!list.length) return null;
       return (
-        <div className="flex items-center gap-1 text-xs text-notion-muted">
-          <MessageSquare className="w-3.5 h-3.5 shrink-0" />
-          {list.length} комментариев
+        <div
+          className="flex items-center gap-1 text-[12px] text-notion-muted tabular-nums"
+          aria-label={`${list.length} комментариев`}
+        >
+          <MessageSquare className="w-3.5 h-3.5 shrink-0" aria-hidden />
+          {list.length}
         </div>
       );
     }
     default: {
       if (raw === undefined || raw === null || raw === '') return null;
       if (typeof raw === 'object') {
-        return <p className="text-xs text-notion-muted line-clamp-2">{JSON.stringify(raw)}</p>;
+        return <p className="text-[12px] text-notion-muted line-clamp-2">{JSON.stringify(raw)}</p>;
       }
-      return <p className="text-xs text-notion-muted line-clamp-2">{String(raw)}</p>;
+      return <p className="text-[12px] text-notion-muted line-clamp-2">{String(raw)}</p>;
     }
   }
 }
@@ -166,7 +174,11 @@ function TitleBlock({ field, booking, compact }) {
   const s = typeof raw === 'string' ? raw.trim() : '';
   return (
     <div
-      className={`font-medium text-white line-clamp-2 leading-snug ${compact ? 'text-[11px] sm:text-xs' : ''}`}
+      className={
+        compact
+          ? 'font-medium text-notion-fg line-clamp-2 leading-snug text-[12px] sm:text-[13px]'
+          : 'tile-title line-clamp-2'
+      }
     >
       {s || 'Без названия'}
     </div>
@@ -188,6 +200,43 @@ function isTileFieldFullWidth(field) {
   ]);
   if (compactInline.has(t)) return false;
   return true;
+}
+
+const PROSE_TYPES = new Set(['text', 'textarea', 'email', 'phone', 'url']);
+/** Числовые поля кроме суммы — строкой в блоке описания */
+function isProseNumberField(field) {
+  return field.type === 'number' && field.key !== 'amount';
+}
+
+/**
+ * Порядок секций как в Notion: мета → текст → бейджи → клиент → комментарии (сумма отдельно в подвале).
+ * @param {any[]} fields — после исключения date/time и amount
+ */
+function partitionGalleryMiddleFields(fields) {
+  /** @type {any[]} */
+  const prose = [];
+  /** @type {any[]} */
+  const chips = [];
+  /** @type {any[]} */
+  const client = [];
+  /** @type {any[]} */
+  const comments = [];
+  for (const f of fields) {
+    if (f.type === 'client') {
+      client.push(f);
+      continue;
+    }
+    if (f.type === 'comments') {
+      comments.push(f);
+      continue;
+    }
+    if (PROSE_TYPES.has(f.type) || isProseNumberField(f)) {
+      prose.push(f);
+      continue;
+    }
+    chips.push(f);
+  }
+  return { prose, chips, client, comments };
 }
 
 /**
@@ -237,15 +286,141 @@ export function GalleryTileBookingContent({ booking, fields, galleryTileFieldVis
   const dateTimeNodes = dateTimeFields.map((field) => wrapMiddleField(field)).filter(Boolean);
   const afterDateTimeNodes = afterDateTimeFields.map((field) => wrapMiddleField(field)).filter(Boolean);
 
+  function blockContent(field) {
+    return renderFieldBlock(field, booking, fields, tagsField, ctx);
+  }
+
+  if (!compact) {
+    const { prose, chips, client, comments } = partitionGalleryMiddleFields(afterDateTimeFields);
+    const hasComments = comments.length > 0;
+
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-1.5">
+        {titleField ? (
+          <TitleBlock field={titleField} booking={booking} compact={false} />
+        ) : (
+          <div className="tile-title line-clamp-2">
+            {typeof booking.title === 'string' && booking.title.trim() ? booking.title : 'Без названия'}
+          </div>
+        )}
+
+        {dateTimeFields.length > 0 ? (
+          <div className="tile-meta flex flex-wrap items-center gap-x-2 gap-y-1">
+            {dateTimeFields.map((field) => {
+              const block = blockContent(field);
+              if (!block) return null;
+              return (
+                <div key={field.id} className="min-w-0">
+                  {block}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+          {prose.length > 0 ? (
+            <div className="flex min-w-0 w-full flex-col gap-1.5">
+              {prose.map((field) => {
+                const block = blockContent(field);
+                if (!block) return null;
+                return (
+                  <div key={field.id} className="tile-desc min-w-0 w-full">
+                    {block}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {chips.length > 0 ? (
+            <div className="tile-tags min-w-0 w-full">
+              <div className="flex flex-wrap content-start items-start gap-[3px]">
+                {chips.map((field) => {
+                  const block = blockContent(field);
+                  if (!block) return null;
+                  const fullRow = field.type === 'multiselect' || field.type === 'tags';
+                  return (
+                    <div
+                      key={field.id}
+                      className={
+                        fullRow
+                          ? 'w-full min-w-0 shrink-0 basis-full'
+                          : 'max-w-full min-w-0 shrink-0 basis-auto'
+                      }
+                    >
+                      {block}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {client.map((field) => {
+            const block = blockContent(field);
+            if (!block) return null;
+            return (
+              <div key={field.id} className="min-w-0 w-full">
+                {block}
+              </div>
+            );
+          })}
+        </div>
+
+        {hasAmount ? (
+          <div className="tile-foot mt-auto flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <div className="min-w-0 flex flex-col items-start gap-0.5">
+              {amountFields.map((field) => {
+                const block = blockContent(field);
+                if (!block) return null;
+                return (
+                  <div key={field.id} className="tile-amount text-left">
+                    {block}
+                  </div>
+                );
+              })}
+            </div>
+            {hasComments ? (
+              <div className="min-w-0 flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                {comments.map((field) => {
+                  const block = blockContent(field);
+                  if (!block) return null;
+                  return (
+                    <div key={field.id} className="min-w-0">
+                      {block}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : hasComments ? (
+          <div className="tile-foot mt-auto flex shrink-0 flex-wrap items-center gap-2">
+            {comments.map((field) => {
+              const block = blockContent(field);
+              if (!block) return null;
+              return (
+                <div key={field.id} className="min-w-0">
+                  {block}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`flex h-full min-h-0 flex-col ${compact ? 'gap-1' : 'gap-1.5'} ${compact ? 'text-[10px] sm:text-[11px]' : ''}`}
+      className={`flex h-full min-h-0 flex-col ${compact ? 'gap-1' : 'gap-1.5'} ${compact ? 'text-[11px] sm:text-[12px]' : ''}`}
     >
       {titleField ? (
         <TitleBlock field={titleField} booking={booking} compact={compact} />
       ) : (
         <div
-          className={`font-medium text-white line-clamp-2 leading-snug ${compact ? 'text-[11px] sm:text-xs' : ''}`}
+          className={`font-medium text-notion-fg line-clamp-2 leading-snug ${compact ? 'text-[12px] sm:text-[13px]' : ''}`}
         >
           {typeof booking.title === 'string' && booking.title.trim() ? booking.title : 'Без названия'}
         </div>
@@ -253,12 +428,12 @@ export function GalleryTileBookingContent({ booking, fields, galleryTileFieldVis
       <div className={`mt-0.5 flex min-h-0 flex-col gap-1.5 ${hasAmount ? 'flex-1' : ''}`}>
         <div className={`flex flex-col gap-1.5 w-full min-w-0 ${hasAmount ? 'flex-1' : ''}`}>
           {dateTimeNodes.length > 0 ? (
-            <div className="flex flex-wrap gap-x-1.5 gap-y-1 items-start content-start w-full min-w-0">
+            <div className="flex flex-wrap gap-x-1.5 gap-y-1.5 items-center content-start w-full min-w-0">
               {dateTimeNodes}
             </div>
           ) : null}
           {afterDateTimeNodes.length > 0 ? (
-            <div className="flex flex-wrap gap-x-1.5 gap-y-1 items-start content-start w-full min-w-0">
+            <div className="flex flex-wrap gap-x-1.5 gap-y-1.5 items-center content-start w-full min-w-0">
               {afterDateTimeNodes}
             </div>
           ) : null}

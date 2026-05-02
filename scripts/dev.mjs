@@ -4,10 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const server = path.join(root, 'server');
-const concurrentlyBin =
-  process.platform === 'win32'
-    ? path.join(root, 'node_modules', '.bin', 'concurrently.cmd')
-    : path.join(root, 'node_modules', '.bin', 'concurrently');
+// Run concurrently via Node so repo paths with spaces work on Windows (no `.cmd` / `cmd /c`).
+const concurrentlyCli = path.join(root, 'node_modules', 'concurrently', 'dist', 'bin', 'concurrently.js');
 
 const migrate = spawnSync('node', ['scripts/prisma-with-schema.mjs', 'migrate', 'deploy'], {
   cwd: server,
@@ -18,13 +16,7 @@ if (migrate.status !== 0) {
   process.exit(migrate.status ?? 1);
 }
 
-const command = process.platform === 'win32' ? 'cmd.exe' : concurrentlyBin;
-const commandArgs =
-  process.platform === 'win32'
-    ? ['/c', concurrentlyBin, '-k', 'npm run dev:vite', 'npm run dev:server']
-    : ['-k', 'npm run dev:vite', 'npm run dev:server'];
-
-const child = spawn(command, commandArgs, {
+const child = spawn(process.execPath, [concurrentlyCli, '-k', 'npm run dev:vite', 'npm run dev:server'], {
   cwd: root,
   stdio: 'inherit',
 });

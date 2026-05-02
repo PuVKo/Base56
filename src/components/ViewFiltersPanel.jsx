@@ -91,13 +91,13 @@ export function ViewFiltersPanel({
           embedded ? 'justify-end' : 'justify-between'
         }`}
       >
-        {embedded ? null : <p className="text-sm font-medium text-white">Фильтры</p>}
+        {embedded ? null : <p className="text-sm font-medium text-notion-fg">Фильтры</p>}
         <div className="flex items-center gap-2">
           {hasFilters && onReset ? (
             <button
               type="button"
               onClick={onReset}
-              className="text-xs text-notion-muted hover:text-white px-2 py-1 rounded-md border border-transparent hover:border-notion-border"
+              className="text-xs text-notion-muted hover:text-notion-fg px-2 py-1 rounded-md border border-transparent hover:border-notion-border"
             >
               Сбросить
             </button>
@@ -106,7 +106,7 @@ export function ViewFiltersPanel({
             <button
               type="button"
               onClick={() => setConfigureOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 text-xs text-notion-muted hover:text-white px-2 py-1 rounded-md border border-notion-border/80 hover:bg-notion-hover"
+              className="inline-flex items-center gap-1.5 text-xs text-notion-muted hover:text-notion-fg px-2 py-1 rounded-md border border-notion-border/80 hover:bg-notion-hover"
               aria-expanded={configureOpen}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -116,7 +116,7 @@ export function ViewFiltersPanel({
               <div className="absolute right-0 top-full z-[140] mt-1 min-w-[14rem] rounded-lg border border-notion-border bg-[#2a2a2a] shadow-xl p-3 text-xs text-notion-muted space-y-2">
                 <p className="text-[11px] uppercase tracking-wide text-notion-muted/80 mb-1">Что показывать</p>
                 {configureEntries.map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer hover:text-white">
+                  <label key={key} className="flex items-center gap-2 cursor-pointer hover:text-notion-fg">
                     <input
                       type="checkbox"
                       checked={prefs.show[key]}
@@ -154,8 +154,8 @@ export function ViewFiltersPanel({
                 onClick={() => setPrefs((p) => ({ ...p, period: id }))}
                 className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                   prefs.period === id
-                    ? 'bg-violet-600/25 border-violet-500/50 text-white'
-                    : 'border-notion-border text-notion-muted hover:bg-notion-hover hover:text-white'
+                    ? 'bg-brand/18 border-brand/45 text-brand font-medium'
+                    : 'border-notion-border text-notion-muted hover:bg-notion-hover hover:text-notion-fg'
                 }`}
               >
                 {label}
@@ -190,7 +190,7 @@ export function ViewFiltersPanel({
                   type="button"
                   onClick={() => setPrefs((p) => ({ ...p, statusIds: toggleId(p.statusIds, it.id) }))}
                   className={`text-xs px-2 py-1 rounded-md border transition-all ${cls} ${
-                    on ? 'ring-2 ring-violet-400/60 ring-offset-2 ring-offset-[#1e1e1e]' : 'opacity-80 hover:opacity-100'
+                    on ? 'ring-2 ring-brand/55 ring-offset-2 ring-offset-notion-bg' : 'opacity-80 hover:opacity-100'
                   }`}
                 >
                   {it.label}
@@ -215,7 +215,7 @@ export function ViewFiltersPanel({
                   type="button"
                   onClick={() => setPrefs((p) => ({ ...p, sourceIds: toggleId(p.sourceIds, it.id) }))}
                   className={`text-xs px-2 py-1 rounded-md border transition-all ${cls} ${
-                    on ? 'ring-2 ring-violet-400/60 ring-offset-2 ring-offset-[#1e1e1e]' : 'opacity-80 hover:opacity-100'
+                    on ? 'ring-2 ring-brand/55 ring-offset-2 ring-offset-notion-bg' : 'opacity-80 hover:opacity-100'
                   }`}
                 >
                   {it.label}
@@ -240,7 +240,7 @@ export function ViewFiltersPanel({
                   type="button"
                   onClick={() => setPrefs((p) => ({ ...p, tagIds: toggleId(p.tagIds, it.id) }))}
                   className={`text-xs px-2 py-1 rounded-md border transition-all ${cls} ${
-                    on ? 'ring-2 ring-violet-400/60 ring-offset-2 ring-offset-[#1e1e1e]' : 'opacity-80 hover:opacity-100'
+                    on ? 'ring-2 ring-brand/55 ring-offset-2 ring-offset-notion-bg' : 'opacity-80 hover:opacity-100'
                   }`}
                 >
                   {it.label}
@@ -260,7 +260,7 @@ export function ViewFiltersPanel({
             value={prefs.search}
             onChange={(e) => setPrefs((p) => ({ ...p, search: e.target.value }))}
             placeholder="Название или описание…"
-            className="w-full max-w-md rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-white placeholder:text-notion-muted/60"
+            className="w-full max-w-md rounded-lg border border-notion-border bg-notion-bg px-3 py-2 text-sm text-notion-fg placeholder:text-notion-muted/60"
           />
         </div>
       ) : null}

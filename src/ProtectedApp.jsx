@@ -48,14 +48,14 @@ export function ProtectedApp() {
   if (state === 'error') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-notion-bg text-notion-muted px-6 text-center max-w-md mx-auto">
-        <p className="text-white font-medium mb-2">Не удалось связаться с сервером</p>
+        <p className="text-notion-fg font-medium mb-2">Не удалось связаться с сервером</p>
         <p className="text-sm mb-4 text-notion-muted break-words" role="status">
           {loadError ?? 'Неизвестная ошибка'}
         </p>
         <button
           type="button"
           onClick={() => setLoadAttempt((n) => n + 1)}
-          className="px-4 py-2 rounded-lg border border-notion-border text-white hover:bg-notion-hover transition-colors text-sm font-medium"
+          className="px-4 py-2 rounded-lg border border-notion-border text-notion-fg hover:bg-notion-hover transition-colors text-sm font-medium"
         >
           Повторить
         </button>

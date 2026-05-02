@@ -12,10 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.join(__dirname, '..');
 dotenv.config({ path: path.join(serverRoot, '.env') });
 
-const prismaBin =
-  process.platform === 'win32'
-    ? path.join(serverRoot, 'node_modules', '.bin', 'prisma.cmd')
-    : path.join(serverRoot, 'node_modules', '.bin', 'prisma');
+// Invoke Prisma via Node (not `.cmd`) so paths with spaces work on Windows.
+const prismaCli = path.join(serverRoot, 'node_modules', 'prisma', 'build', 'index.js');
 
 function readDatabaseUrl() {
   const fromEnv = process.env.DATABASE_URL?.trim();
@@ -42,14 +40,10 @@ if (args.length === 0) {
 }
 
 const schema = prismaSchemaPath();
-const command = process.platform === 'win32' ? 'cmd.exe' : prismaBin;
-const commandArgs =
-  process.platform === 'win32' ? ['/c', prismaBin, ...args, '--schema', schema] : [...args, '--schema', schema];
 
-const r = spawnSync(command, commandArgs, {
+const r = spawnSync(process.execPath, [prismaCli, ...args, '--schema', schema], {
   cwd: serverRoot,
   stdio: 'inherit',
   env: process.env,
-  shell: false,
 });
 process.exit(r.status ?? 1);

@@ -1,10 +1,24 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Base56 — рабочий календарь для специалистов</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('base56-theme');
+          var mode = t === 'light' ? 'light' : 'dark';
+          document.documentElement.classList.remove('dark', 'light');
+          document.documentElement.classList.add(mode);
+          document.documentElement.dataset.theme = mode;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

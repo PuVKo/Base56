@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PasswordInput } from '@/components/PasswordInput.jsx';
+import { AuthThemeToggle } from '@/components/ThemeToggle.jsx';
 import { apiFetch } from '@/lib/api';
 import { resetPasswordSchema } from '@/lib/validation';
 
@@ -32,12 +33,17 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-notion-bg px-4">
+      <div className="relative min-h-screen min-h-[100dvh] bg-notion-bg px-4">
+        <AuthThemeToggle
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-10"
+        />
+        <div className="flex min-h-screen min-h-[100dvh] items-center justify-center">
         <div className="w-full max-w-sm rounded-xl border border-notion-border bg-notion-surface/90 p-6 shadow-xl text-center">
           <p className="text-sm text-rose-300 mb-4">Нет токена в ссылке</p>
           <Link to="/login" className="text-violet-300 text-sm">
             Ко входу
           </Link>
+        </div>
         </div>
       </div>
     );
@@ -45,21 +51,30 @@ export default function ResetPasswordPage() {
 
   if (ok) {
     return (
-      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-notion-bg px-4">
+      <div className="relative min-h-screen min-h-[100dvh] bg-notion-bg px-4">
+        <AuthThemeToggle
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-10"
+        />
+        <div className="flex min-h-screen min-h-[100dvh] items-center justify-center">
         <div className="w-full max-w-sm rounded-xl border border-notion-border bg-notion-surface/90 p-6 shadow-xl text-center">
-          <h1 className="text-xl font-semibold text-white mb-2">Пароль обновлён</h1>
+          <h1 className="text-xl font-semibold text-notion-fg mb-2">Пароль обновлён</h1>
           <Link to="/login" className="text-violet-300 hover:text-violet-200 text-sm font-medium">
             Войти
           </Link>
+        </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-notion-bg px-4">
+    <div className="relative min-h-screen min-h-[100dvh] bg-notion-bg px-4">
+      <AuthThemeToggle
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-10"
+      />
+      <div className="flex min-h-screen min-h-[100dvh] items-center justify-center">
       <div className="w-full max-w-sm rounded-xl border border-notion-border bg-notion-surface/90 p-6 shadow-xl">
-        <h1 className="text-xl font-semibold text-white mb-1">Новый пароль</h1>
+        <h1 className="text-xl font-semibold text-notion-fg mb-1">Новый пароль</h1>
         <p className="text-sm text-notion-muted mb-6">Не короче 8 символов</p>
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
@@ -83,6 +98,7 @@ export default function ResetPasswordPage() {
             Сохранить
           </button>
         </form>
+      </div>
       </div>
     </div>
   );
